@@ -10,7 +10,7 @@ import { authenticationRequiredResponse } from '@/lib/server/api-responses';
 import { getServerSession } from '@/lib/server/auth';
 import { getRedisClient } from '@/lib/server/redis';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 function redisKey(profileId: string): string {
   const safe = profileId.replace(/[^a-zA-Z0-9_-]/g, '');

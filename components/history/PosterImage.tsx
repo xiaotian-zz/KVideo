@@ -3,6 +3,7 @@
  */
 
 
+import Image from 'next/image';
 import { Icons } from '@/components/ui/Icon';
 
 interface PosterImageProps {
@@ -15,12 +16,15 @@ export function PosterImage({ poster, title, progress }: PosterImageProps) {
     return (
         <div className="relative w-28 h-16 flex-shrink-0 bg-[var(--glass-bg)] rounded-[var(--radius-2xl)] overflow-hidden">
             {poster ? (
-                <img
+                <Image
                     src={poster}
                     alt={title}
+                    width={112}
+                    height={64}
+                    unoptimized
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
+                        const target = e.currentTarget;
                         target.style.display = 'none';
                         const parent = target.parentElement;
                         if (parent) {

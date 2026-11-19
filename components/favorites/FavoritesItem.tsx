@@ -3,6 +3,7 @@
  * Matches HistoryItem layout for consistency
  */
 
+import Image from 'next/image';
 import { Icons } from '@/components/ui/Icon';
 import { formatDate } from '@/lib/utils/format-utils';
 import { getSourceName } from '@/lib/utils/source-names';
@@ -55,25 +56,28 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
                 href={getVideoUrl()}
                 onClick={(e) => {
                     e.preventDefault();
-                    handleClick(e as any);
+                    handleClick(e);
                     if (!e.ctrlKey && !e.metaKey) {
                         window.location.href = getVideoUrl();
                     }
                 }}
-                onAuxClick={(e) => handleClick(e as any)}
+                onAuxClick={(e) => handleClick(e)}
                 className="block"
             >
                 <div className="flex gap-3">
                     {/* Poster - Same size as HistoryItem */}
                     <div className="relative w-28 h-16 flex-shrink-0 bg-[var(--glass-bg)] rounded-[var(--radius-2xl)] overflow-hidden">
                         {item.poster ? (
-                            <img
+                            <Image
                                 src={item.poster}
                                 alt={item.title}
+                                width={112}
+                                height={64}
+                                unoptimized
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
                                 onError={(e) => {
-                                    const target = e.currentTarget as HTMLImageElement;
+                                    const target = e.currentTarget;
                                     target.style.display = 'none';
                                 }}
                             />

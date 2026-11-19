@@ -1,10 +1,9 @@
 /**
- * User Sources Store - Per-user video sources and danmaku APIs
- * Uses localStorage keyed by profileId for isolation between users
+ * User Sources Store - 仅保存用户个人的弹幕 API。
+ * 视频源已改为管理员维护的全局配置（Kvrocks），不再按用户保存。
  */
 
 import { getProfileId } from './auth-store';
-import type { VideoSource } from '@/lib/types';
 
 export interface DanmakuApiEntry {
   id: string;
@@ -13,7 +12,6 @@ export interface DanmakuApiEntry {
 }
 
 interface UserSourcesState {
-  sources: VideoSource[];
   danmakuApis: DanmakuApiEntry[];
   activeDanmakuApiId: string | null;
 }
@@ -25,19 +23,18 @@ function getStorageKey(): string {
 
 function getState(): UserSourcesState {
   if (typeof window === 'undefined') {
-    return { sources: [], danmakuApis: [], activeDanmakuApiId: null };
+    return { danmakuApis: [], activeDanmakuApiId: null };
   }
   try {
     const raw = localStorage.getItem(getStorageKey());
-    if (!raw) return { sources: [], danmakuApis: [], activeDanmakuApiId: null };
+    if (!raw) return { danmakuApis: [], activeDanmakuApiId: null };
     const parsed = JSON.parse(raw);
     return {
-      sources: Array.isArray(parsed.sources) ? parsed.sources : [],
       danmakuApis: Array.isArray(parsed.danmakuApis) ? parsed.danmakuApis : [],
       activeDanmakuApiId: parsed.activeDanmakuApiId ?? null,
     };
   } catch {
-    return { sources: [], danmakuApis: [], activeDanmakuApiId: null };
+    return { danmakuApis: [], activeDanmakuApiId: null };
   }
 }
 
@@ -61,10 +58,6 @@ export const userSourcesStore = {
 
   getState,
 
-  getSources(): VideoSource[] {
-    return getState().sources;
-  },
-
   getDanmakuApis(): DanmakuApiEntry[] {
     return getState().danmakuApis;
   },
@@ -73,27 +66,6 @@ export const userSourcesStore = {
     const state = getState();
     if (!state.activeDanmakuApiId) return null;
     return state.danmakuApis.find(a => a.id === state.activeDanmakuApiId) ?? null;
-  },
-
-  addSource(source: VideoSource): void {
-    const state = getState();
-    if (state.sources.find(s => s.id === source.id)) return;
-    saveState({ ...state, sources: [...state.sources, { ...source, enabled: true }] });
-  },
-
-  removeSource(id: string): void {
-    const state = getState();
-    saveState({ ...state, sources: state.sources.filter(s => s.id !== id) });
-  },
-
-  toggleSource(id: string): void {
-    const state = getState();
-    saveState({
-      ...state,
-      sources: state.sources.map(s =>
-        s.id === id ? { ...s, enabled: !s.enabled } : s
-      ),
-    });
   },
 
   addDanmakuApi(entry: DanmakuApiEntry): void {
@@ -112,5 +84,14 @@ export const userSourcesStore = {
   setActiveDanmakuApi(id: string | null): void {
     const state = getState();
     saveState({ ...state, activeDanmakuApiId: id });
+  },
+
+  // 用于从服务端恢复当前用户的弹幕 API
+  replaceState(next: Partial<UserSourcesState>): void {
+    const state = getState();
+    saveState({
+      danmakuApis: Array.isArray(next.danmakuApis) ? next.danmakuApis : state.danmakuApis,
+      activeDanmakuApiId: next.activeDanmakuApiId ?? null,
+    });
   },
 };

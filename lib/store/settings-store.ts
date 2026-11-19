@@ -79,6 +79,12 @@ const SETTINGS_KEY = 'kvideo-settings';
 export const getDefaultSources = (): VideoSource[] => DEFAULT_SOURCES;
 export const getDefaultPremiumSources = (): VideoSource[] => PREMIUM_SOURCES;
 
+function isValidVideoSource(source: unknown): source is VideoSource {
+  if (!source || typeof source !== 'object') return false;
+  const candidate = source as Partial<VideoSource>;
+  return Boolean(candidate.id && candidate.name && candidate.baseUrl);
+}
+
 
 
 function getEnvSubscriptions(customValue?: string): SourceSubscription[] {
@@ -90,10 +96,10 @@ function getEnvSubscriptions(customValue?: string): SourceSubscription[] {
     const raw = JSON.parse(envValue);
     if (Array.isArray(raw)) {
       return raw
-        .filter((item: any) => item && typeof item.name === 'string' && typeof item.url === 'string')
-        .map((item: any) => createSubscription(item.name, item.url));
+        .filter((item: { name?: unknown; url?: unknown }) => item && typeof item.name === 'string' && typeof item.url === 'string')
+        .map((item: { name: string; url: string }) => createSubscription(item.name, item.url));
     }
-  } catch (e) {
+  } catch {
     // Ignore JSON parse error, try direct URL
   }
 
@@ -218,16 +224,16 @@ export const settingsStore = {
 
       // Filter out invalid sources (missing baseUrl etc)
       const validSources = (Array.isArray(parsed.sources) ? parsed.sources : getDefaultSources())
-        .filter((s: any) => s && s.id && s.name && s.baseUrl);
+        .filter(isValidVideoSource);
 
       const validPremiumSources = (Array.isArray(parsed.premiumSources) ? parsed.premiumSources : getDefaultPremiumSources())
-        .filter((s: any) => s && s.id && s.name && s.baseUrl);
+        .filter(isValidVideoSource);
 
       // Validate that parsed data has all required properties
       return {
         sources: validSources,
         premiumSources: validPremiumSources,
-        subscriptions: mergedSubscriptions.filter((s: any) => s && s.id && s.name && s.url),
+        subscriptions: mergedSubscriptions.filter((s: SourceSubscription) => s && s.id && s.name && s.url),
         sortBy: parsed.sortBy || 'default',
         searchHistory: parsed.searchHistory !== undefined ? parsed.searchHistory : true,
         watchHistory: parsed.watchHistory !== undefined ? parsed.watchHistory : true,

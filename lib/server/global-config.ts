@@ -1,0 +1,102 @@
+import { getRedisClient } from '@/lib/server/redis';
+import {
+  DEFAULT_METADATA_CONFIG,
+  normalizeMetadataConfig,
+  type MetadataConfig,
+} from '@/lib/metadata';
+import type { SourceSubscription, VideoSource } from '@/lib/types';
+
+/**
+ * 全局配置：由管理员维护，所有用户共用。
+ * 视频源、代理配置和豆瓣 Cookies 都只存这一份。
+ */
+export interface GlobalConfig {
+  sources: VideoSource[];
+  premiumSources: VideoSource[];
+  subscriptions: SourceSubscription[];
+  metadata: MetadataConfig;
+  updatedAt: number;
+}
+
+export const GLOBAL_CONFIG_KEY = 'global:config:v1';
+export const MAX_GLOBAL_CONFIG_BYTES = 4 * 1024 * 1024;
+
+function isVideoSource(value: unknown): value is VideoSource {
+  if (!value || typeof value !== 'object') return false;
+  const source = value as Partial<VideoSource>;
+  return typeof source.id === 'string' &&
+    typeof source.name === 'string' &&
+    typeof source.baseUrl === 'string';
+}
+
+function isSubscription(value: unknown): value is SourceSubscription {
+  if (!value || typeof value !== 'object') return false;
+  const subscription = value as Partial<SourceSubscription>;
+  return typeof subscription.id === 'string' &&
+    typeof subscription.name === 'string' &&
+    typeof subscription.url === 'string';
+}
+
+export function normalizeGlobalConfig(value: unknown): GlobalConfig | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Partial<GlobalConfig>;
+
+  return {
+    sources: Array.isArray(input.sources) ? input.sources.filter(isVideoSource) : [],
+    premiumSources: Array.isArray(input.premiumSources)
+      ? input.premiumSources.filter(isVideoSource)
+      : [],
+    subscriptions: Array.isArray(input.subscriptions)
+      ? input.subscriptions.filter(isSubscription)
+      : [],
+    metadata: input.metadata
+      ? normalizeMetadataConfig(input.metadata)
+      : { ...DEFAULT_METADATA_CONFIG },
+    updatedAt: typeof input.updatedAt === 'number' ? input.updatedAt : Date.now(),
+  };
+}
+
+export async function readGlobalConfig(): Promise<GlobalConfig | null> {
+  const redis = getRedisClient();
+  if (!redis) return null;
+
+  const stored = await redis.get(GLOBAL_CONFIG_KEY);
+  if (!stored) return null;
+
+  return normalizeGlobalConfig(stored);
+}
+
+export async function writeGlobalConfig(value: unknown): Promise<GlobalConfig> {
+  const redis = getRedisClient();
+  if (!redis) {
+    throw new Error('Server-side storage is not configured');
+  }
+
+  const existing = await readGlobalConfig();
+  const input = (value && typeof value === 'object' ? value : {}) as Partial<GlobalConfig>;
+
+  // 部分更新：只覆盖请求中提供的字段，避免保存代理配置时清空视频源
+  const config = normalizeGlobalConfig({
+    sources: input.sources ?? existing?.sources ?? [],
+    premiumSources: input.premiumSources ?? existing?.premiumSources ?? [],
+    subscriptions: input.subscriptions ?? existing?.subscriptions ?? [],
+    metadata: {
+      ...(existing?.metadata ?? DEFAULT_METADATA_CONFIG),
+      ...(input.metadata ?? {}),
+    },
+    updatedAt: Date.now(),
+  });
+
+  if (!config) {
+    throw new Error('Invalid global config');
+  }
+
+  const serialized = JSON.stringify(config);
+  const size = new TextEncoder().encode(serialized).length;
+  if (size > MAX_GLOBAL_CONFIG_BYTES) {
+    throw new Error('Global config exceeds the storage limit');
+  }
+
+  await redis.set(GLOBAL_CONFIG_KEY, config);
+  return config;
+}

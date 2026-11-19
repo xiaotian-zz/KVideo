@@ -64,8 +64,7 @@ export const FavoritesGrid = memo(function FavoritesGrid({
 
   const handleCardClick = useCallback((
     e: React.MouseEvent,
-    cardId: string,
-    videoUrl: string
+    cardId: string
   ) => {
     setActiveCardId(cardId);
   }, []);

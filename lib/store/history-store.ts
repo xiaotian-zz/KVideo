@@ -210,12 +210,12 @@ const createHistoryStore = (name: string) =>
       {
         name,
         version: 2,
-        migrate: (persistedState: any, version: number) => {
+        migrate: (persistedState: unknown, version: number) => {
           if (version < 2) {
             // Migrate from v1: merge entries with same normalized title
-            const oldHistory = persistedState?.viewingHistory || [];
+            const oldHistory = (persistedState as { viewingHistory?: VideoHistoryItem[] })?.viewingHistory || [];
             return {
-              ...persistedState,
+              ...(persistedState as Record<string, unknown>),
               viewingHistory: migrateHistory(oldHistory),
             };
           }
