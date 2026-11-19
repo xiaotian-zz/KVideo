@@ -92,7 +92,7 @@ export function SourceSelector({
                 initial[s.source] = s.latency;
             }
         });
-        setLatencies(initial);
+        queueMicrotask(() => setLatencies(initial));
     }, [sources]);
 
     if (sources.length <= 1) {

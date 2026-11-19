@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react';
-import Hls from 'hls.js';
+import Hls, {
+    type HlsConfig,
+    type LoaderCallbacks,
+    type LoaderConfiguration,
+    type LoaderContext
+} from 'hls.js';
 import { usePlayerSettings } from './usePlayerSettings';
 import { filterM3u8Ad } from '@/lib/utils/m3u8-utils';
 import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
@@ -48,14 +53,14 @@ export function useHlsPlayer({
         if (isMSESupported) {
 
             // Define custom loader class to intercept manifest loading
-            // We use 'any' cast because default loader type might not be strictly exposed in all typings
-            const DefaultLoader = (Hls as any).DefaultConfig.loader;
+            const DefaultLoader = Hls.DefaultConfig.loader;
 
             class AdFilterLoader extends DefaultLoader {
-                load(context: any, config: any, callbacks: any) {
-                    if (isAdFilterEnabled && (context.type === 'manifest' || context.type === 'level')) {
+                load(context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>) {
+                    const contextType: string = context.type;
+                    if (isAdFilterEnabled && (contextType === 'manifest' || contextType === 'level')) {
                         const originalOnSuccess = callbacks.onSuccess;
-                        callbacks.onSuccess = (response: any, stats: any, context: any, networkDetails: any) => {
+                        callbacks.onSuccess = (response, stats, context, networkDetails) => {
                             if (typeof response.data === 'string') {
                                 try {
                                     // Filter the content
@@ -76,7 +81,7 @@ export function useHlsPlayer({
                 // Exceptions might exist for iOS where MSE is strictly not available, check Hls.isSupported() result carefully.
                 // Hls.isSupported() is false on iOS Safari usually, so this block won't run there.
 
-                const config: any = {
+                const config: Partial<HlsConfig> = {
                     // Worker & Performance
                     enableWorker: true,
                     lowLatencyMode: false,

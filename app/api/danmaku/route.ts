@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
         'Cache-Control': 'public, max-age=3600', // Cache danmaku for 1 hour
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch from danmaku API' },
       { status: 502, headers: CORS_HEADERS }

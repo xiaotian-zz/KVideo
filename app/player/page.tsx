@@ -40,6 +40,7 @@ function PlayerContent() {
 
   const videoId = searchParams.get('id');
   const source = searchParams.get('source');
+  const sourceNameParam = searchParams.get('sourceName');
   const title = searchParams.get('title');
   const episodeParam = searchParams.get('episode');
   // Support both legacy 'groupedSources' (full JSON) and new 'gs' (sessionStorage key)
@@ -64,9 +65,11 @@ function PlayerContent() {
   const [isEpisodeSectionCollapsed, setIsEpisodeSectionCollapsed] = useState(false);
 
   // Sync with store changes if any (though usually it's one-way from UI to store)
-  useEffect(() => {
+  const [prevModeStore, setPrevModeStore] = useState(modeStore);
+  if (modeStore !== prevModeStore) {
+    setPrevModeStore(modeStore);
     setIsReversed(modeStore.getSettings().episodeReverseOrder);
-  }, [modeStore]);
+  }
 
   useEffect(() => {
     localStorage.setItem(PLAYER_VIEWPORT_MODE_KEY, playerViewportMode);
@@ -168,7 +171,7 @@ function PlayerContent() {
       sources.unshift({
         id: videoId || '',
         source,
-        sourceName: getSourceName(source),
+        sourceName: sourceNameParam || getSourceName(source),
         pic: videoData?.vod_pic,
       });
     }
@@ -179,7 +182,7 @@ function PlayerContent() {
     }
 
     return sources;
-  }, [discoveredSources, groupedSourcesParam, gsKey, source, videoData?.vod_pic, videoId]);
+  }, [discoveredSources, groupedSourcesParam, gsKey, source, sourceNameParam, videoData?.vod_pic, videoId]);
 
   useEffect(() => {
     groupedSourcesRef.current = groupedSources;
@@ -291,9 +294,11 @@ function PlayerContent() {
   const [currentSourceId, setCurrentSourceId] = useState(source);
   const playerTimeRef = useRef(0);
 
-  useEffect(() => {
+  const [prevSourceParam, setPrevSourceParam] = useState(source);
+  if (source !== prevSourceParam) {
+    setPrevSourceParam(source);
     setCurrentSourceId(source);
-  }, [source]);
+  }
 
   // Track detected video resolution from the player
   const [detectedResolution, setDetectedResolution] = useState<VideoResolutionInfo | null>(null);
@@ -466,6 +471,7 @@ function PlayerContent() {
                 <VideoMetadata
                   videoData={videoData}
                   source={source}
+                  sourceName={sourceNameParam || (source ? getSourceName(source) : null)}
                   title={title}
                 />
               </div>
@@ -512,6 +518,7 @@ function PlayerContent() {
                   <VideoMetadata
                     videoData={videoData}
                     source={source}
+                    sourceName={sourceNameParam || (source ? getSourceName(source) : null)}
                     title={title}
                   />
                 </div>

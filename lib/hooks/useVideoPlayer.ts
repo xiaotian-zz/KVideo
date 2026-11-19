@@ -166,7 +166,12 @@ export function useVideoPlayer(
   }, [videoId, source, videoError, fetchVideoDetails]);
 
   // Sync state from params if they change externally (e.g. back/forward navigation)
-  useEffect(() => {
+  const [prevEpisodeSync, setPrevEpisodeSync] = useState<{ param: string | null; data: VideoData | null }>({
+    param: episodeParam,
+    data: videoData,
+  });
+  if (episodeParam !== prevEpisodeSync.param || videoData !== prevEpisodeSync.data) {
+    setPrevEpisodeSync({ param: episodeParam, data: videoData });
     if (videoData?.episodes && episodeParam !== null) {
       const index = parseInt(episodeParam, 10);
       if (!isNaN(index) && index >= 0 && index < videoData.episodes.length) {
@@ -176,15 +181,21 @@ export function useVideoPlayer(
         }
       }
     }
-  }, [episodeParam, videoData, currentEpisode]);
+  }
+
+  // Reset state when source changes
+  const [prevFetchKey, setPrevFetchKey] = useState(`${videoId}|${source}`);
+  const fetchKey = `${videoId}|${source}`;
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey);
+    setVideoData(null);
+    setCurrentEpisode(0);
+    setPlayUrl('');
+  }
 
   useEffect(() => {
     if (videoId && source) {
-      // Reset state when source changes to ensure clean fetch
-      setVideoData(null);
-      setCurrentEpisode(0);
-      setPlayUrl('');
-      fetchVideoDetails();
+      queueMicrotask(() => fetchVideoDetails());
     }
   }, [videoId, source, fetchVideoDetails]);
 

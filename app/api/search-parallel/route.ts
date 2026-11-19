@@ -6,6 +6,7 @@
  */
 
 import { NextRequest } from 'next/server';
+import type { VideoSource } from '@/lib/types';
 import { searchVideos } from '@/lib/api/client';
 import { getSourceName } from '@/lib/utils/source-names';
 import { traditionalToSimplified } from '@/lib/utils/chinese-convert';
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        const body = await request.json();
+        const body = (await request.json()) as { query?: unknown; sources?: VideoSource[] };
         const { query, sources: sourceConfigs } = body;
 
         if (!query || typeof query !== 'string' || query.trim().length === 0) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
         let completedSources = 0;
         let totalVideosFound = 0;
 
-        const searchPromises = sources.map(async (source: any) => {
+        const searchPromises = sources.map(async (source) => {
           if (signal.aborted) return;
 
           const startTime = performance.now();
@@ -90,9 +91,9 @@ export async function POST(request: NextRequest) {
             if (videos.length > 0 && !signal.aborted) {
               safeSend({
                 type: 'videos',
-                videos: videos.map((video: any) => ({
+                videos: videos.map((video) => ({
                   ...video,
-                  sourceDisplayName: getSourceName(source.id),
+                  sourceDisplayName: source.name || getSourceName(source.id),
                   latency,
                 })),
                 source: source.id,
@@ -129,9 +130,9 @@ export async function POST(request: NextRequest) {
                   if (pageVideos.length > 0 && !signal.aborted) {
                     safeSend({
                       type: 'videos',
-                      videos: pageVideos.map((video: any) => ({
+                      videos: pageVideos.map((video) => ({
                         ...video,
-                        sourceDisplayName: getSourceName(source.id),
+                        sourceDisplayName: source.name || getSourceName(source.id),
                         latency,
                       })),
                       source: source.id,

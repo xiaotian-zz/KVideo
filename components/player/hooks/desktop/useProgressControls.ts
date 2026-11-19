@@ -19,10 +19,14 @@ export function useProgressControls({
 }: UseProgressControlsProps) {
     const lastDragTimeRef = useRef<number>(0);
 
-    const getEventPos = useCallback((e: any, rect: DOMRect) => {
+    const getEventPos = useCallback((
+        e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement> | MouseEvent | TouchEvent,
+        rect: DOMRect
+    ) => {
         // Handle both mouse and touch events
-        const clientX = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
-        const clientY = e.clientY || (e.touches && e.touches[0]?.clientY) || 0;
+        const touch = 'touches' in e ? e.touches[0] : undefined;
+        const clientX = ('clientX' in e ? e.clientX : 0) || touch?.clientX || 0;
+        const clientY = ('clientY' in e ? e.clientY : 0) || touch?.clientY || 0;
 
         if (isRotated) {
             // When rotated 90deg, visual left->right is physical top->bottom
@@ -33,7 +37,7 @@ export function useProgressControls({
         }
     }, [isRotated]);
 
-    const handleProgressClick = useCallback((e: any) => {
+    const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
         if (!videoRef.current || !progressBarRef.current) return;
         const rect = progressBarRef.current.getBoundingClientRect();
         const pos = getEventPos(e, rect);
@@ -43,13 +47,13 @@ export function useProgressControls({
         setCurrentTime(newTime);
     }, [videoRef, progressBarRef, duration, setCurrentTime, getEventPos]);
 
-    const handleProgressMouseDown = useCallback((e: any) => {
+    const handleProgressMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         e.preventDefault();
         isDraggingProgressRef.current = true;
         handleProgressClick(e);
     }, [isDraggingProgressRef, handleProgressClick]);
 
-    const handleProgressTouchStart = useCallback((e: any) => {
+    const handleProgressTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
         e.preventDefault();
         isDraggingProgressRef.current = true;
         handleProgressClick(e);

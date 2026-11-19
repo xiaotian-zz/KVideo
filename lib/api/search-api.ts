@@ -16,7 +16,8 @@ async function searchVideosBySource(
     const startTime = Date.now();
 
     const url = new URL(`${source.baseUrl}${source.searchPath}`);
-    url.searchParams.set('ac', 'detail');
+    // 与 LunaTV 一致：苹果 CMS 搜索参数为 ac=videolist&wd=<关键词>&pg=<页码>
+    url.searchParams.set('ac', 'videolist');
     url.searchParams.set('wd', query);
     url.searchParams.set('pg', page.toString());
 

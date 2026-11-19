@@ -37,6 +37,9 @@ interface DesktopControlsProps {
     onProgressMouseDown: (e: React.MouseEvent<HTMLDivElement>) => void;
     onProgressTouchStart: (e: React.TouchEvent<HTMLDivElement>) => void;
     formatTime: (seconds: number) => string;
+    onHoverTime?: (time: number | null) => void;
+    previewImage?: string | null;
+    previewLoading?: boolean;
 }
 
 export function DesktopControls(props: DesktopControlsProps) {
@@ -50,6 +53,9 @@ export function DesktopControls(props: DesktopControlsProps) {
         onProgressMouseDown,
         onProgressTouchStart,
         formatTime,
+        onHoverTime,
+        previewImage,
+        previewLoading,
     } = props;
 
     return (
@@ -70,6 +76,10 @@ export function DesktopControls(props: DesktopControlsProps) {
                 onProgressClick={onProgressClick}
                 onProgressMouseDown={onProgressMouseDown}
                 onProgressTouchStart={onProgressTouchStart}
+                onHoverTime={onHoverTime}
+                previewImage={previewImage}
+                previewLoading={previewLoading}
+                formatTime={formatTime}
             />
 
             {/* Controls Bar */}

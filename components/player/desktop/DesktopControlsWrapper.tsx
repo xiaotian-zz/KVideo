@@ -2,6 +2,7 @@ import React from 'react';
 import { DesktopControls } from './DesktopControls';
 import { useDesktopPlayerState } from '../hooks/useDesktopPlayerState';
 import { useDesktopPlayerLogic } from '../hooks/useDesktopPlayerLogic';
+import { useThumbnailPreview } from '../hooks/useThumbnailPreview';
 
 interface DesktopControlsWrapperProps {
     src: string;
@@ -50,6 +51,8 @@ export function DesktopControlsWrapper({ src, data, logic, refs }: DesktopContro
     } = refs;
 
     const isProxied = src.includes('/api/proxy');
+    const canPreview = Number.isFinite(duration) && duration > 0;
+    const { imageUrl, loading: previewLoading, requestPreview } = useThumbnailPreview(src, duration);
 
     return (
         <DesktopControls
@@ -84,6 +87,9 @@ export function DesktopControlsWrapper({ src, data, logic, refs }: DesktopContro
             onProgressMouseDown={handleProgressMouseDown}
             onProgressTouchStart={handleProgressTouchStart}
             formatTime={formatTime}
+            onHoverTime={canPreview ? requestPreview : undefined}
+            previewImage={imageUrl}
+            previewLoading={previewLoading}
         />
     );
 }

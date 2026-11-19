@@ -54,7 +54,7 @@ export function useDanmaku({ videoTitle, episodeName, episodeIndex }: UseDanmaku
   // Fetch danmaku comments when enabled and API URL is configured
   useEffect(() => {
     if (!danmakuEnabled || !apiUrl || !videoTitle) {
-      setComments([]);
+      queueMicrotask(() => setComments([]));
       return;
     }
 

@@ -1,5 +1,6 @@
-export function getSourceName(sourceId: string): string {
-  const sourceNames: Record<string, string> = {
+import { settingsStore } from '@/lib/store/settings-store';
+
+const BUILTIN_SOURCE_NAMES: Record<string, string> = {
     'zuida': '最大资源',
     'wujin': '无尽资源',
     'tianya': '天涯资源',
@@ -38,8 +39,29 @@ export function getSourceName(sourceId: string): string {
     'feifan1': '非凡线路1',
     'moduzy': '魔都影视',
     'leba': '乐播资源',
-  };
-  return sourceNames[sourceId] || sourceId;
+};
+
+/**
+ * 解析源显示名：优先使用后台填写的中文名称，其次内置映射，最后回退到源 ID。
+ */
+export function getSourceName(sourceId: string): string {
+  if (!sourceId) return sourceId;
+
+  if (typeof window !== 'undefined') {
+    try {
+      const settings = settingsStore.getSettings();
+      const matched = [
+        ...(settings.sources || []),
+        ...(settings.premiumSources || []),
+        ...(settings.subscriptions || []),
+      ].find((source) => source.id === sourceId);
+      if (matched?.name) return matched.name;
+    } catch {
+      // settings 尚未初始化时走内置映射
+    }
+  }
+
+  return BUILTIN_SOURCE_NAMES[sourceId] || sourceId;
 }
 
 export const SOURCE_IDS = [

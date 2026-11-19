@@ -22,11 +22,15 @@ export function useStallDetection({
     isTransitioningToNextEpisode
 }: UseStallDetectionProps) {
     const lastTimeRef = useRef<number>(0);
-    const lastUpdateTimeRef = useRef<number>(Date.now());
+    const lastUpdateTimeRef = useRef<number>(0);
     const isStalledByMeRef = useRef<boolean>(false);
 
     useEffect(() => {
         if (!videoRef.current) return;
+
+        // 在 effect 中初始化时间基准，避免渲染期调用 Date.now()
+        lastTimeRef.current = videoRef.current.currentTime;
+        lastUpdateTimeRef.current = Date.now();
 
         const checkStall = () => {
             if (!videoRef.current) return;

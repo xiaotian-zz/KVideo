@@ -29,13 +29,15 @@ export function useResolutionBadge(resolution: VideoResolutionInfo | null) {
 
   // Show badge when resolution first detected or changes
   useEffect(() => {
-    if (resolution) {
-      setVisible(true);
-      startHideTimer();
-    } else {
-      setVisible(false);
-      clearTimer();
-    }
+    queueMicrotask(() => {
+      if (resolution) {
+        setVisible(true);
+        startHideTimer();
+      } else {
+        setVisible(false);
+        clearTimer();
+      }
+    });
   }, [resolution, startHideTimer, clearTimer]);
 
   // Briefly show badge on user interaction

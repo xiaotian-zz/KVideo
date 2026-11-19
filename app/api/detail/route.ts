@@ -6,13 +6,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVideoDetail } from '@/lib/api/client';
 import { getSourceById } from '@/lib/api/video-sources';
+import { readGlobalConfig } from '@/lib/server/global-config';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 /**
  * Shared handler for fetching video details
  */
-async function handleDetailRequest(id: string | null, source: string | null, method: string) {
+async function handleDetailRequest(id: string | null, source: string | null) {
   // Validate input
   if (!id) {
     return NextResponse.json(
@@ -35,8 +36,15 @@ async function handleDetailRequest(id: string | null, source: string | null, met
   if (typeof source === 'object') {
     sourceConfig = source;
   } else {
-    // If source is a string ID (from GET), try to look it up
+    // 先查内置源，再查 Kvrocks 中的全局源（新标签页打开时客户端配置可能尚未同步）
     sourceConfig = getSourceById(source);
+    if (!sourceConfig) {
+      const globalConfig = await readGlobalConfig();
+      sourceConfig = [
+        ...(globalConfig?.sources || []),
+        ...(globalConfig?.premiumSources || []),
+      ].find((item) => item.id === source);
+    }
   }
 
   if (!sourceConfig) {
@@ -77,7 +85,7 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id');
     const source = searchParams.get('source');
 
-    return await handleDetailRequest(id, source, 'GET');
+    return await handleDetailRequest(id, source);
   } catch (error) {
     console.error('Detail API error:', error);
 
@@ -97,7 +105,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { id, source } = body;
 
-    return await handleDetailRequest(id, source, 'POST');
+    return await handleDetailRequest(id, source);
   } catch (error) {
     console.error('Detail API error:', error);
 

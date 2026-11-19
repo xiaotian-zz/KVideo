@@ -3,7 +3,7 @@
 import React from 'react';
 import { Icons } from '@/components/ui/Icon';
 import { usePlayerSettings } from '../hooks/usePlayerSettings';
-import { settingsStore, AdFilterMode } from '@/lib/store/settings-store';
+import { AdFilterMode } from '@/lib/store/settings-store';
 
 import { createPortal } from 'react-dom';
 
@@ -41,14 +41,12 @@ export function DesktopMoreMenu({
         autoSkipOutro,
         skipOutroSeconds,
         showModeIndicator,
-        adFilter,
         setAutoNextEpisode,
         setAutoSkipIntro,
         setSkipIntroSeconds,
         setAutoSkipOutro,
         setSkipOutroSeconds,
         setShowModeIndicator,
-        setAdFilter,
         adFilterMode,
         setAdFilterMode,
         fullscreenType,
@@ -66,7 +64,15 @@ export function DesktopMoreMenu({
 
     const buttonRef = React.useRef<HTMLButtonElement>(null);
     const menuRef = React.useRef<HTMLDivElement>(null);
-    const [menuPosition, setMenuPosition] = React.useState({ top: 0, left: 0, maxHeight: 'none', openUpward: false, align: 'right' as 'left' | 'right' });
+    const [menuPosition, setMenuPosition] = React.useState<{
+        top: number;
+        left: number;
+        maxHeight: string;
+        openUpward: boolean;
+        align: 'left' | 'right';
+        buttonWidth: number;
+        portalTarget: HTMLElement | null;
+    }>({ top: 0, left: 0, maxHeight: 'none', openUpward: false, align: 'right', buttonWidth: 0, portalTarget: null });
     const [isAdFilterOpen, setAdFilterOpen] = React.useState(false);
 
     const AD_FILTER_LABELS: Record<string, string> = {
@@ -145,7 +151,9 @@ export function DesktopMoreMenu({
                 left: left,
                 maxHeight: `${maxHeight}px`,
                 openUpward: openUpward,
-                align: align
+                align: align,
+                buttonWidth: buttonRect.width,
+                portalTarget: null
             });
         } else if (isFullscreen && !isRotated) {
             // Fullscreen Mode (not rotated): Use container-relative coordinates
@@ -186,7 +194,9 @@ export function DesktopMoreMenu({
                 left: isLeftHalf ? left : left + buttonWidth,
                 maxHeight: `${maxHeight}px`,
                 openUpward: openUpward,
-                align: align
+                align: align,
+                buttonWidth: buttonWidth,
+                portalTarget: containerRef.current
             });
         } else {
             // Rotated Mode: Use Container Coordinates (offset loop) and Portal to Container
@@ -201,7 +211,6 @@ export function DesktopMoreMenu({
             }
 
             const buttonWidth = buttonRef.current.offsetWidth;
-            const buttonHeight = buttonRef.current.offsetHeight;
             const containerWidth = containerRef.current.offsetWidth;
             const containerHeight = containerRef.current.offsetHeight;
 
@@ -234,7 +243,9 @@ export function DesktopMoreMenu({
                 left: left, // Fixed vertical container coordinate
                 maxHeight: `${maxHeight}px`,
                 openUpward: openUpward,
-                align: align
+                align: align,
+                buttonWidth: buttonWidth,
+                portalTarget: containerRef.current
             });
         }
     }, [containerRef, isRotated, isFullscreen]);
@@ -283,7 +294,7 @@ export function DesktopMoreMenu({
                         right: `calc(100% - ${menuPosition.left}px + 10px)`,
                         left: 'auto'
                     } : {
-                        left: `${menuPosition.left + buttonRef.current?.offsetWidth! + 10}px`,
+                        left: `${menuPosition.left + menuPosition.buttonWidth + 10}px`,
                         right: 'auto'
                     }),
 
@@ -649,7 +660,7 @@ export function DesktopMoreMenu({
 
             {/* More Menu Dropdown (Portal) */}
             {/* More Menu Dropdown (Portal) */}
-            {showMoreMenu && typeof document !== 'undefined' && createPortal(MenuContent, ((isRotated || isFullscreen) && containerRef.current) ? containerRef.current : document.body)}
+            {showMoreMenu && typeof document !== 'undefined' && createPortal(MenuContent, menuPosition.portalTarget ?? document.body)}
         </div>
     );
 }

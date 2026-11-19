@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useHistory } from '@/lib/store/history-store';
 import { CustomVideoPlayer } from './CustomVideoPlayer';
@@ -62,7 +62,10 @@ export function VideoPlayer({
 
   // Get video metadata from URL params
   const source = searchParams.get('source') || '';
-  const title = searchParams.get('title') || '未知视频';
+  const videoTitleFromParams = useMemo(
+    () => searchParams.get('title') || '未知视频',
+    [searchParams]
+  );
 
   // Get saved progress for this video
   const getSavedProgress = () => {
@@ -76,7 +79,7 @@ export function VideoPlayer({
     if (!videoId) return 0;
 
     // Match by normalized title + episode index (source-agnostic)
-    const normalizedTitle = title.toLowerCase().trim();
+    const normalizedTitle = videoTitleFromParams.toLowerCase().trim();
     const historyItem = viewingHistory.find(item =>
       item.title.toLowerCase().trim() === normalizedTitle &&
       item.episodeIndex === currentEpisode
@@ -90,7 +93,7 @@ export function VideoPlayer({
     if (!videoId || !playUrl || duration === 0 || currentTime <= 1) return;
     addToHistory(
       videoId,
-      title,
+      videoTitleFromParams,
       playUrl,
       currentEpisode,
       source,
@@ -99,7 +102,7 @@ export function VideoPlayer({
       undefined,
       []
     );
-  }, [videoId, playUrl, title, currentEpisode, source, addToHistory]);
+  }, [videoId, playUrl, videoTitleFromParams, currentEpisode, source, addToHistory]);
 
   // Handle time updates and save progress (throttled to every 5 seconds)
   const handleTimeUpdate = useCallback((currentTime: number, duration: number) => {
@@ -117,7 +120,7 @@ export function VideoPlayer({
       lastSaveTimeRef.current = now;
       saveProgress(currentTime, duration);
     }
-  }, [videoId, playUrl, saveProgress]);
+  }, [videoId, playUrl, saveProgress, externalTimeRef]);
 
   // Save on page leave/refresh
   useEffect(() => {

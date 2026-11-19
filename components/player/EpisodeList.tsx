@@ -242,14 +242,15 @@ export function EpisodeList({
   // Keep the current episode's page visible when order/layout changes
   useEffect(() => {
     if (!episodes || episodes.length === 0) {
-      setEpisodePage(0);
+      queueMicrotask(() => setEpisodePage(0));
       return;
     }
     const displayIndex = isReversed
       ? episodes.length - 1 - currentEpisode
       : currentEpisode;
     const page = Math.floor(displayIndex / EPISODES_PER_PAGE);
-    setEpisodePage(Math.min(Math.max(0, page), Math.max(0, Math.ceil(episodes.length / EPISODES_PER_PAGE) - 1)));
+    const nextPage = Math.min(Math.max(0, page), Math.max(0, Math.ceil(episodes.length / EPISODES_PER_PAGE) - 1));
+    queueMicrotask(() => setEpisodePage(nextPage));
   }, [currentEpisode, episodes, isReversed, episodeLayout]);
 
   const pagedEpisodes = useMemo(() => {

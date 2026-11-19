@@ -131,7 +131,7 @@ export function DesktopVideoPlayer({
   }, []);
 
   React.useEffect(() => {
-    updateViewportMetrics();
+    queueMicrotask(updateViewportMetrics);
 
     const visualViewport = window.visualViewport;
     window.addEventListener('resize', updateViewportMetrics);
@@ -159,7 +159,7 @@ export function DesktopVideoPlayer({
   const shouldForceLandscape = data.fullscreenMode === 'window' && isIOS && !isLandscape;
 
   React.useEffect(() => {
-    updateViewportMetrics();
+    queueMicrotask(updateViewportMetrics);
 
     if (data.fullscreenMode !== 'window') return;
 
@@ -190,7 +190,7 @@ export function DesktopVideoPlayer({
 
   React.useEffect(() => {
     if (!data.isFullscreen) {
-      setFullscreenClock('');
+      queueMicrotask(() => setFullscreenClock(''));
       return;
     }
 

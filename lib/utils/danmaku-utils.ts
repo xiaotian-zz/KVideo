@@ -1,15 +1,40 @@
 import type { DanmakuComment, DanmakuSearchResult, DanmakuEpisode } from '@/lib/types/danmaku';
 
+interface RawDanmakuComment {
+  p?: string;
+  m?: string;
+  text?: string;
+  time?: number;
+  type?: DanmakuComment['type'];
+  color?: string;
+}
+
+interface RawDanmakuSearchItem {
+  animeId?: string | number;
+  id?: string | number;
+  animeTitle?: string;
+  title?: string;
+  episodes?: RawDanmakuEpisode[];
+}
+
+interface RawDanmakuEpisode {
+  episodeId?: string | number;
+  id?: string | number;
+  episodeTitle?: string;
+  title?: string;
+}
+
 /**
  * Parse danmu_api response into normalized DanmakuComment[]
  * Handles both /api/v2/comment/{id} format and raw arrays
  */
-export function parseDanmakuResponse(data: any): DanmakuComment[] {
+export function parseDanmakuResponse(data: unknown): DanmakuComment[] {
   // The danmu_api /api/v2/comment/{id} returns { count, comments: [...] }
-  const comments = data?.comments || data?.data || (Array.isArray(data) ? data : []);
+  const payload = data as { comments?: unknown; data?: unknown } | null | undefined;
+  const comments = (payload?.comments || payload?.data || (Array.isArray(data) ? data : [])) as RawDanmakuComment[];
 
   return comments
-    .map((c: any) => {
+    .map((c) => {
       // danmu_api format: { p: "time,type,color", m: "text" }
       // or normalized: { time, type, color, text }
       if (c.p && c.m) {
@@ -43,13 +68,14 @@ export function parseDanmakuResponse(data: any): DanmakuComment[] {
 /**
  * Parse danmu_api search results into DanmakuSearchResult[]
  */
-export function parseSearchResults(data: any): DanmakuSearchResult[] {
-  const animes = data?.animes || data?.data || (Array.isArray(data) ? data : []);
+export function parseSearchResults(data: unknown): DanmakuSearchResult[] {
+  const payload = data as { animes?: unknown; data?: unknown } | null | undefined;
+  const animes = (payload?.animes || payload?.data || (Array.isArray(data) ? data : [])) as RawDanmakuSearchItem[];
 
-  return animes.map((a: any) => ({
+  return animes.map((a) => ({
     animeId: a.animeId ?? a.id ?? '',
     animeTitle: a.animeTitle ?? a.title ?? '',
-    episodes: (a.episodes || []).map((ep: any) => ({
+    episodes: (a.episodes || []).map((ep) => ({
       episodeId: ep.episodeId ?? ep.id ?? '',
       episodeTitle: ep.episodeTitle ?? ep.title ?? '',
     })),
