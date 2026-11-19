@@ -13,7 +13,6 @@ interface ResultsHeaderProps {
 export function ResultsHeader({
   loading,
   resultsCount,
-  availableSources,
 }: ResultsHeaderProps) {
   return (
     <div className="flex flex-col gap-4 mb-6">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { LanguageBadge } from '@/lib/types';
 
 /**
@@ -26,16 +26,24 @@ export function useLanguageBadges<T extends { vod_lang?: string }>(videos: T[]) 
       .sort((a, b) => b.count - a.count);
   }, [videos]);
 
+  // 仅保留仍存在的语言，避免用 effect 清理状态
+  const effectiveSelectedLangs = useMemo(() => {
+    if (selectedLangs.size === 0) return selectedLangs;
+    const availableLangs = new Set(languageBadges.map(b => b.lang));
+    const filtered = new Set(Array.from(selectedLangs).filter(lang => availableLangs.has(lang)));
+    return filtered.size === selectedLangs.size ? selectedLangs : filtered;
+  }, [selectedLangs, languageBadges]);
+
   // Filter videos by selected languages
   const filteredVideos = useMemo(() => {
-    if (selectedLangs.size === 0) {
+    if (effectiveSelectedLangs.size === 0) {
       return videos;
     }
 
     return videos.filter(video =>
-      video.vod_lang && selectedLangs.has(video.vod_lang.trim())
+      video.vod_lang && effectiveSelectedLangs.has(video.vod_lang.trim())
     );
-  }, [videos, selectedLangs]);
+  }, [videos, effectiveSelectedLangs]);
 
   // Toggle language selection
   const toggleLang = useCallback((lang: string) => {
@@ -50,25 +58,9 @@ export function useLanguageBadges<T extends { vod_lang?: string }>(videos: T[]) 
     });
   }, []);
 
-  // Auto-cleanup: remove selected langs that no longer exist in badges
-  useEffect(() => {
-    const availableLangs = new Set(languageBadges.map(b => b.lang));
-
-    setSelectedLangs(prev => {
-      const filtered = new Set(
-        Array.from(prev).filter(lang => availableLangs.has(lang))
-      );
-
-      if (filtered.size !== prev.size) {
-        return filtered;
-      }
-      return prev;
-    });
-  }, [languageBadges]);
-
   return {
     languageBadges,
-    selectedLangs,
+    selectedLangs: effectiveSelectedLangs,
     filteredVideos,
     toggleLang,
   };

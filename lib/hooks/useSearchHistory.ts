@@ -27,7 +27,6 @@ export function useSearchHistory(
   isPremium: boolean = false
 ): UseSearchHistoryReturn {
   const {
-    searchHistory,
     addToSearchHistory,
     removeFromSearchHistory,
     clearSearchHistory,

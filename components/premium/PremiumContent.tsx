@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { TagManager } from '@/components/home/TagManager';
 import { MovieGrid } from '@/components/home/MovieGrid';
 import { PremiumContentGrid } from './PremiumContentGrid';
@@ -41,11 +41,14 @@ export function PremiumContent({ onSearch }: PremiumContentProps) {
     // Track whether the recommendation tab is active
     const [isRecommendSelected, setIsRecommendSelected] = useState(hasHistory);
 
-    useEffect(() => {
+    // 历史记录可用时在渲染阶段自动切换到推荐标签
+    const [prevHasHistory, setPrevHasHistory] = useState(hasHistory);
+    if (hasHistory !== prevHasHistory) {
+        setPrevHasHistory(hasHistory);
         if (hasHistory) {
             setIsRecommendSelected(true);
         }
-    }, [hasHistory]);
+    }
 
     const effectiveRecommendSelected = hasHistory && isRecommendSelected;
 
@@ -60,9 +63,9 @@ export function PremiumContent({ onSearch }: PremiumContentProps) {
         loadMoreRef,
     } = usePremiumContent(effectiveRecommendSelected ? '' : categoryValue);
 
-    const handleVideoClick = (video: any) => {
+    const handleVideoClick = (video: { vod_name?: string; title?: string }) => {
         if (onSearch) {
-            onSearch(video.vod_name || video.title);
+            onSearch(video.vod_name || video.title || '');
         }
     };
 

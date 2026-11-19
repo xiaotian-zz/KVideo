@@ -34,8 +34,8 @@ export function usePremiumContent(categoryValue: string) {
             const premiumSources = [
                 ...settings.premiumSources,
                 // Check if any subscription sources are marked as premium
-                ...settings.subscriptions.filter(s => (s as any).group === 'premium')
-            ].filter(s => (s as any).enabled !== false);
+                ...settings.subscriptions.filter(s => (s as unknown as Record<string, unknown>).group === 'premium')
+            ].filter(s => (s as unknown as Record<string, unknown>).enabled !== false);
 
             if (premiumSources.length === 0) {
                 setLoading(false);
@@ -72,18 +72,23 @@ export function usePremiumContent(categoryValue: string) {
         }
     }, [loading, categoryValue]);
 
-    // Initial load and category change
-    useEffect(() => {
+    // 分类变化时在渲染阶段重置分页状态
+    const [prevCategory, setPrevCategory] = useState(categoryValue);
+    if (categoryValue !== prevCategory) {
+        setPrevCategory(categoryValue);
         setPage(1);
         setVideos([]);
         setHasMore(true);
+    }
 
+    // Initial load and category change
+    useEffect(() => {
         // Initial check for sources
         const settings = settingsStore.getSettings();
         const sourcesCount = settings.premiumSources.length + settings.subscriptions.length;
         sourceCountRef.current = sourcesCount;
 
-        loadVideos(1, false);
+        queueMicrotask(() => loadVideos(1, false));
     }, [categoryValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Subscribe to settings changes to handle async source loading
@@ -92,8 +97,8 @@ export function usePremiumContent(categoryValue: string) {
             const settings = settingsStore.getSettings();
             const premiumSources = [
                 ...settings.premiumSources,
-                ...settings.subscriptions.filter(s => (s as any).group === 'premium')
-            ].filter(s => (s as any).enabled !== false);
+                ...settings.subscriptions.filter(s => (s as unknown as Record<string, unknown>).group === 'premium')
+            ].filter(s => (s as unknown as Record<string, unknown>).enabled !== false);
 
             const currentSourceCount = premiumSources.length;
 

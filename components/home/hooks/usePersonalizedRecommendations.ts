@@ -76,7 +76,7 @@ export function usePersonalizedRecommendations(isPremium = false) {
           );
           if (!res.ok) return { label: query.label, movies: [] as DoubanMovie[] };
           const data = await res.json();
-          const movies: DoubanMovie[] = (data.subjects || []).map((s: any) => ({
+          const movies: DoubanMovie[] = (data.subjects || []).map((s: DoubanMovie) => ({
             id: s.id,
             title: s.title,
             cover: s.cover,
@@ -95,64 +95,71 @@ export function usePersonalizedRecommendations(isPremium = false) {
 
   // Initial load
   useEffect(() => {
-    if (viewingHistory.length < 2) {
-      setMovies([]);
-      setHasMore(false);
-      return;
-    }
-
-    const queries = generateRecommendations(viewingHistory);
-    queriesRef.current = queries;
-    roundRef.current = 0;
-    allSeenTitlesRef.current = new Set();
-
-    if (queries.length === 0) {
-      setMovies([]);
-      setHasMore(false);
-      return;
-    }
-
-    // Cache key based on query tags (not pageStart, since that's randomized)
-    const cacheKey = queries.map(q => `${q.tag}:${q.type}`).join('|');
-
-    if (
-      cacheRef.current &&
-      cacheRef.current.key === cacheKey &&
-      Date.now() - cacheRef.current.timestamp < CACHE_DURATION
-    ) {
-      setMovies(cacheRef.current.movies);
-      // Rebuild seen titles from cache
-      for (const m of cacheRef.current.movies) {
-        allSeenTitlesRef.current.add(m.title.toLowerCase().trim());
-      }
-      setHasMore(true);
-      return;
-    }
-
     let cancelled = false;
-    setLoading(true);
-    setPage(0);
-    setHasMore(true);
 
-    const watchedTitles = getWatchedTitles(viewingHistory);
-
-    fetchPage(queries, 0, watchedTitles).then((interleaved) => {
-      if (cancelled) return;
-      setMovies(interleaved);
-      for (const m of interleaved) {
-        allSeenTitlesRef.current.add(m.title.toLowerCase().trim());
+    // 异步执行初始化，避免在 effect 内同步 setState
+    const initialize = async () => {
+      if (viewingHistory.length < 2) {
+        setMovies([]);
+        setHasMore(false);
+        return;
       }
-      // Always assume there's more — we can regenerate queries if this round exhausts
-      setHasMore(interleaved.length > 0);
-      cacheRef.current = {
-        key: queries.map(q => `${q.tag}:${q.type}`).join('|'),
-        movies: interleaved,
-        timestamp: Date.now(),
-      };
-      setLoading(false);
-    }).catch(() => {
-      if (!cancelled) setLoading(false);
-    });
+
+      const queries = generateRecommendations(viewingHistory);
+      queriesRef.current = queries;
+      roundRef.current = 0;
+      allSeenTitlesRef.current = new Set();
+
+      if (queries.length === 0) {
+        setMovies([]);
+        setHasMore(false);
+        return;
+      }
+
+      // Cache key based on query tags (not pageStart, since that's randomized)
+      const cacheKey = queries.map(q => `${q.tag}:${q.type}`).join('|');
+
+      if (
+        cacheRef.current &&
+        cacheRef.current.key === cacheKey &&
+        Date.now() - cacheRef.current.timestamp < CACHE_DURATION
+      ) {
+        if (cancelled) return;
+        setMovies(cacheRef.current.movies);
+        // Rebuild seen titles from cache
+        for (const m of cacheRef.current.movies) {
+          allSeenTitlesRef.current.add(m.title.toLowerCase().trim());
+        }
+        setHasMore(true);
+        return;
+      }
+
+      setLoading(true);
+      setPage(0);
+      setHasMore(true);
+
+      const watchedTitles = getWatchedTitles(viewingHistory);
+
+      fetchPage(queries, 0, watchedTitles).then((interleaved) => {
+        if (cancelled) return;
+        setMovies(interleaved);
+        for (const m of interleaved) {
+          allSeenTitlesRef.current.add(m.title.toLowerCase().trim());
+        }
+        // Always assume there's more — we can regenerate queries if this round exhausts
+        setHasMore(interleaved.length > 0);
+        cacheRef.current = {
+          key: queries.map(q => `${q.tag}:${q.type}`).join('|'),
+          movies: interleaved,
+          timestamp: Date.now(),
+        };
+        setLoading(false);
+      }).catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    };
+
+    initialize();
 
     return () => { cancelled = true; };
   }, [viewingHistory.length, fetchPage]); // eslint-disable-line react-hooks/exhaustive-deps

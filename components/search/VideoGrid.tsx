@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo, memo, useEffect } from 'react';
+import { useState, useRef, useCallback, useMemo, memo, useEffect, useSyncExternalStore } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { VideoCard } from './VideoCard';
 import { VideoGroupCard, GroupedVideo } from './VideoGroupCard';
@@ -23,23 +23,28 @@ export const VideoGrid = memo(function VideoGrid({
 }: VideoGridProps) {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(24);
-  const [displayMode, setDisplayMode] = useState<'normal' | 'grouped'>('normal');
   const gridRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Load display mode from settings
+  // 订阅设置存储中的展示模式，避免在 effect 中同步 setState
+  const displayMode = useSyncExternalStore(
+    (onStoreChange) => settingsStore.subscribe(onStoreChange),
+    () => settingsStore.getSettings().searchDisplayMode,
+    () => 'normal' as const
+  );
+
+  // Initial load: Check for saved scroll position to ensure we render enough items
   useEffect(() => {
     const settings = settingsStore.getSettings();
-    setDisplayMode(settings.searchDisplayMode);
+    if (!settings.rememberScrollPosition) return;
 
-    // Initial load: Check for saved scroll position to ensure we render enough items
     const params = searchParams.toString();
     const scrollKey = `scroll-pos:${pathname}${params ? '?' + params : ''}`;
     const savedPos = sessionStorage.getItem(scrollKey);
 
-    if (savedPos && settings.rememberScrollPosition) {
+    if (savedPos) {
       const position = parseInt(savedPos, 10);
       if (!isNaN(position) && position > 500) {
         // Approximate visible count needed: 
@@ -57,22 +62,13 @@ export const VideoGrid = memo(function VideoGrid({
         const neededCount = Math.min(videos.length, estimatedRowsNeeded * itemsPerRow);
 
         if (neededCount > 24) {
-          setVisibleCount(Math.ceil(neededCount / 24) * 24);
+          const nextCount = Math.ceil(neededCount / 24) * 24;
+          // 挂载后再恢复滚动所需数量，避免同步 setState 造成级联渲染
+          queueMicrotask(() => setVisibleCount(nextCount));
         }
       }
     }
-
-    const unsubscribe = settingsStore.subscribe(() => {
-      const newSettings = settingsStore.getSettings();
-      setDisplayMode(newSettings.searchDisplayMode);
-    });
-
-    return () => unsubscribe();
   }, [pathname, searchParams, videos.length]);
-
-  if (videos.length === 0) {
-    return null;
-  }
 
   // Build stable list of videos to probe for resolution
   const videosToProbe = useMemo(() => {
@@ -186,6 +182,11 @@ export const VideoGrid = memo(function VideoGrid({
   const { resolutions, isProbing } = useResolutionProbe(probeList);
 
   const totalItems = displayMode === 'grouped' ? groupItems.length : videoItems.length;
+
+  // 空结果在全部 Hook 调用之后再返回，保证 Hook 顺序稳定
+  if (videos.length === 0) {
+    return null;
+  }
 
   return (
     <>

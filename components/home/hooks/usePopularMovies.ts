@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useInfiniteScroll } from '@/lib/hooks/useInfiniteScroll';
+import type { Tag } from '../SortableTag';
 
 interface DoubanMovie {
     id: string;
@@ -11,7 +12,7 @@ interface DoubanMovie {
 
 const PAGE_LIMIT = 20;
 
-export function usePopularMovies(selectedTag: string, tags: any[], contentType: 'movie' | 'tv' = 'movie') {
+export function usePopularMovies(selectedTag: string, tags: Tag[], contentType: 'movie' | 'tv' = 'movie') {
     const [movies, setMovies] = useState<DoubanMovie[]>([]);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
@@ -42,11 +43,18 @@ export function usePopularMovies(selectedTag: string, tags: any[], contentType: 
         }
     }, [loading, tags, contentType]);
 
-    useEffect(() => {
+    // 标签或内容类型变化时，在渲染阶段重置分页状态
+    const [prevQueryKey, setPrevQueryKey] = useState(`${selectedTag}|${contentType}`);
+    const queryKey = `${selectedTag}|${contentType}`;
+    if (queryKey !== prevQueryKey) {
+        setPrevQueryKey(queryKey);
         setPage(0);
         setMovies([]);
         setHasMore(true);
-        loadMovies(selectedTag, 0, false);
+    }
+
+    useEffect(() => {
+        queueMicrotask(() => loadMovies(selectedTag, 0, false));
     }, [selectedTag, contentType]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const { prefetchRef, loadMoreRef } = useInfiniteScroll({

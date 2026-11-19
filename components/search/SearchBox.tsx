@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Icons } from '@/components/ui/Icon';
@@ -38,10 +38,12 @@ export function SearchBox({ onSearch, onClear, initialQuery = '', placeholder = 
         inputRef.current?.blur();
     }, isPremium);
 
-    // Update query when initialQuery changes
-    useEffect(() => {
+    // 当外部初始查询变化时，在渲染阶段同步本地状态
+    const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
+    if (initialQuery !== prevInitialQuery) {
+        setPrevInitialQuery(initialQuery);
         setQuery(initialQuery);
-    }, [initialQuery]);
+    }
 
     const {
         handleSubmit,

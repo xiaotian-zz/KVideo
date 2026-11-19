@@ -1,9 +1,10 @@
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
+import type { Video, SourceBadge } from '@/lib/types';
 
 interface SearchCache {
   query: string;
-  results: any[];
-  availableSources: any[];
+  results: Video[];
+  availableSources: SourceBadge[];
   timestamp: number;
 }
 
@@ -15,15 +16,13 @@ const MAX_CACHED_RESULTS = 300;
 /**
  * Strip unnecessary large fields before caching to save LocalStorage space
  */
-const stripVideoData = (results: any[]) => {
+const stripVideoData = (results: Video[]) => {
   return results.slice(0, MAX_CACHED_RESULTS).map(video => {
     // Remove large text fields that are only needed for the detail page
-    const {
-      vod_content,
-      vod_actor,
-      vod_director,
-      ...rest
-    } = video;
+    const rest = { ...video };
+    delete rest.vod_content;
+    delete rest.vod_actor;
+    delete rest.vod_director;
     return rest;
   });
 };
@@ -36,8 +35,8 @@ export function useSearchCache() {
 
   const saveToCache = useCallback((
     query: string,
-    results: any[],
-    sources: any[]
+    results: Video[],
+    sources: SourceBadge[]
   ) => {
     try {
       const strippedResults = stripVideoData(results);
@@ -58,7 +57,7 @@ export function useSearchCache() {
         try {
           localStorage.removeItem(CACHE_KEY);
           // Try saving only top 100 results if quota exceeded
-          const reducedResults = results.slice(0, 100).map(({ vod_content, vod_actor, vod_director, ...rest }: any) => rest);
+          const reducedResults = stripVideoData(results).slice(0, 100);
           const reducedCache = {
             query,
             results: reducedResults,

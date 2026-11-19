@@ -80,8 +80,15 @@ export function useTagManager() {
         };
 
         loadTags();
-        setSelectedTag(DEFAULT_TAG.id);
     }, [contentType, storageKey]);
+
+    // 内容类型切换时在渲染阶段重置选中标签
+    const [prevTagSource, setPrevTagSource] = useState(`${contentType}|${storageKey}`);
+    const tagSource = `${contentType}|${storageKey}`;
+    if (tagSource !== prevTagSource) {
+        setPrevTagSource(tagSource);
+        setSelectedTag(DEFAULT_TAG.id);
+    }
 
     const saveTags = (newTags: Tag[]) => {
         setTags(newTags);

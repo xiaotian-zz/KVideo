@@ -20,20 +20,34 @@ interface DoubanMovie {
 interface MovieCardProps {
   movie: DoubanMovie;
   onMovieClick: (movie: DoubanMovie) => void;
+  href?: string;
+  openInNewTab?: boolean;
 }
 
-export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieCardProps) {
+export const MovieCard = memo(function MovieCard({
+  movie,
+  onMovieClick,
+  href,
+  openInNewTab = false,
+}: MovieCardProps) {
   const [imageError, setImageError] = useState(false);
   const [fallbackError, setFallbackError] = useState(false);
+  const videoUrl = href ?? `/?q=${encodeURIComponent(movie.title)}`;
 
   return (
     <Link
-      href={`/?q=${encodeURIComponent(movie.title)}`}
+      href={videoUrl}
+      target={openInNewTab ? '_blank' : undefined}
+      rel={openInNewTab ? 'noopener noreferrer' : undefined}
       onClick={(e) => {
         // Allow default behavior for modifier keys (new tab, etc.)
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
         e.preventDefault();
+        if (openInNewTab) {
+          window.open(videoUrl, '_blank', 'noopener,noreferrer');
+          return;
+        }
         onMovieClick(movie);
       }}
       data-focusable
@@ -80,6 +94,7 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation(); // 阻止事件冒泡，防止触发外层卡片的搜索点击
+                if (!movie.url) return;
                 window.open(movie.url, '_blank', 'noopener,noreferrer');
               }}
               title="在豆瓣中查看"

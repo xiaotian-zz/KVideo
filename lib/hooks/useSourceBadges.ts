@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { SourceBadge } from '@/lib/types';
 
 /**
@@ -17,16 +17,24 @@ export function useSourceBadges<T extends { source?: string; sourceName?: string
 ) {
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
 
+  // 仅保留仍存在的源，避免用 effect 清理状态
+  const effectiveSelectedSources = useMemo(() => {
+    if (selectedSources.size === 0) return selectedSources;
+    const availableSourceIds = new Set(availableSources.map(s => s.id));
+    const filtered = new Set(Array.from(selectedSources).filter(sourceId => availableSourceIds.has(sourceId)));
+    return filtered.size === selectedSources.size ? selectedSources : filtered;
+  }, [selectedSources, availableSources]);
+
   // Filter videos by selected sources
   const filteredVideos = useMemo(() => {
-    if (selectedSources.size === 0) {
+    if (effectiveSelectedSources.size === 0) {
       return videos;
     }
 
     return videos.filter(video =>
-      video.source && selectedSources.has(video.source)
+      video.source && effectiveSelectedSources.has(video.source)
     );
-  }, [videos, selectedSources]);
+  }, [videos, effectiveSelectedSources]);
 
   // Toggle source selection
   const toggleSource = useCallback((sourceId: string) => {
@@ -41,25 +49,8 @@ export function useSourceBadges<T extends { source?: string; sourceName?: string
     });
   }, []);
 
-  // Auto-cleanup: remove selected sources that no longer exist
-  useEffect(() => {
-    const availableSourceIds = new Set(availableSources.map(s => s.id));
-
-    setSelectedSources(prev => {
-      const filtered = new Set(
-        Array.from(prev).filter(sourceId => availableSourceIds.has(sourceId))
-      );
-
-      // Only update if changed
-      if (filtered.size !== prev.size) {
-        return filtered;
-      }
-      return prev;
-    });
-  }, [availableSources]);
-
   return {
-    selectedSources,
+    selectedSources: effectiveSelectedSources,
     filteredVideos,
     toggleSource,
   };

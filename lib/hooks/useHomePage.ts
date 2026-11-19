@@ -4,7 +4,6 @@ import { useSearchCache } from '@/lib/hooks/useSearchCache';
 import { useParallelSearch } from '@/lib/hooks/useParallelSearch';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
 import { settingsStore, type SortOption } from '@/lib/store/settings-store';
-import { userSourcesStore } from '@/lib/store/user-sources-store';
 
 export function useHomePage() {
     useSubscriptionSync();
@@ -48,16 +47,8 @@ export function useHomePage() {
         if (!searchQuery.trim()) return false;
 
         const settings = settingsStore.getSettings();
-        const enabledSources = settings.sources.filter(s => s.enabled);
-
-        // Merge user personal sources
-        const userSources = userSourcesStore.getSources().filter(s => s.enabled !== false);
-        const allSources = [...enabledSources];
-        for (const us of userSources) {
-            if (!allSources.find(s => s.id === us.id)) {
-                allSources.push(us);
-            }
-        }
+        // 所有用户统一使用管理员维护的全局视频源
+        const allSources = settings.sources.filter(s => s.enabled);
 
         if (allSources.length === 0) {
             return false;
@@ -130,20 +121,25 @@ export function useHomePage() {
         if (hasLoadedCache.current) return;
         hasLoadedCache.current = true;
 
-        const urlQuery = searchParams.get('q');
-        const cached = loadFromCache();
+        // 异步执行初始化，避免在 effect 内同步 setState
+        const initialize = async () => {
+            const urlQuery = searchParams.get('q');
+            const cached = loadFromCache();
 
-        if (urlQuery) {
-            setQuery(urlQuery);
-            if (cached && cached.query === urlQuery && cached.results.length > 0) {
-                isInitialCacheLoad.current = true;
-                setHasSearched(true);
-                loadCachedResults(cached.results, cached.availableSources);
-                hasSearchedWithSourcesRef.current = true;
-            } else {
-                handleSearch(urlQuery);
+            if (urlQuery) {
+                setQuery(urlQuery);
+                if (cached && cached.query === urlQuery && cached.results.length > 0) {
+                    isInitialCacheLoad.current = true;
+                    setHasSearched(true);
+                    loadCachedResults(cached.results, cached.availableSources);
+                    hasSearchedWithSourcesRef.current = true;
+                } else {
+                    handleSearch(urlQuery);
+                }
             }
-        }
+        };
+
+        initialize();
     }, [searchParams, loadFromCache, loadCachedResults, handleSearch]);
 
 

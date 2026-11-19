@@ -3,7 +3,7 @@
  * Periodically pings video sources when enabled
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore } from 'react';
 import { settingsStore } from '@/lib/store/settings-store';
 import { probeLatencyTargets } from '@/lib/utils/latency';
 
@@ -29,28 +29,17 @@ export function useLatencyPing({
     const mountedRef = useRef(true);
 
     // Check if real-time latency is enabled in settings
-    const [realtimeEnabled, setRealtimeEnabled] = useState(false);
+    const realtimeEnabled = useSyncExternalStore(
+        (onStoreChange) => settingsStore.subscribe(onStoreChange),
+        () => settingsStore.getSettings().realtimeLatency,
+        () => false
+    );
 
     // Stabilize sourceUrls to prevent unnecessary effect re-runs if parent passes new array
     const stableSourceUrls = useMemo(
         () => sourceUrls.map((source) => ({ ...source })),
         [sourceUrls],
     );
-
-    useEffect(() => {
-        const settings = settingsStore.getSettings();
-        setRealtimeEnabled(settings.realtimeLatency);
-
-        // Subscribe to settings changes
-        const unsubscribe = settingsStore.subscribe(() => {
-            const newSettings = settingsStore.getSettings();
-            setRealtimeEnabled(newSettings.realtimeLatency);
-        });
-
-        return () => {
-            unsubscribe();
-        };
-    }, []);
 
     const pingSource = useCallback(async (baseUrl: string): Promise<number | null> => {
         const controller = new AbortController();

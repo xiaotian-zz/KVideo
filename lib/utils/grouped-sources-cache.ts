@@ -7,13 +7,15 @@
  * we store it in sessionStorage and pass a short key in the URL.
  */
 
+import type { SourceInfo } from '@/components/player/EpisodeList';
+
 const CACHE_PREFIX = 'gs:';
 const MAX_CACHE_SIZE = 100;
 
 /**
  * Store grouped sources data and return a short cache key.
  */
-export function storeGroupedSources(data: any[]): string {
+export function storeGroupedSources(data: SourceInfo[]): string {
   if (typeof window === 'undefined') return '';
 
   const key = generateKey();
@@ -33,7 +35,7 @@ export function storeGroupedSources(data: any[]): string {
 /**
  * Retrieve grouped sources data by cache key.
  */
-export function retrieveGroupedSources(key: string): any[] | null {
+export function retrieveGroupedSources(key: string): SourceInfo[] | null {
   if (typeof window === 'undefined' || !key) return null;
   try {
     const raw = sessionStorage.getItem(`${CACHE_PREFIX}${key}`);

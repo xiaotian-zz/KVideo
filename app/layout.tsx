@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AutoSync } from '@/components/AutoSync'; // <-- 引入了自动同步组件
+import { GlobalConfigSync } from '@/components/GlobalConfigSync';
 import { SiteIconProvider } from '@/components/SiteIconProvider';
 import { TVProvider } from "@/lib/contexts/TVContext";
 import { TVNavigationInitializer } from "@/components/TVNavigationInitializer";
@@ -95,6 +96,7 @@ export default async function RootLayout({
         {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
         {/* Apple PWA Support */}
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="KVideo" />
@@ -120,14 +122,16 @@ export default async function RootLayout({
 
               <TVProvider>
                 <TVNavigationInitializer />
+                <GlobalConfigSync />
                 <PasswordGate hasAuth={!!(
-                  process.env.ADMIN_PASSWORD ||
-                  process.env.ACCOUNTS ||
-                  process.env.ACCESS_PASSWORD ||
+                  process.env.AUTH_SECRET &&
                   (
-                    process.env.AUTH_SECRET &&
-                    process.env.UPSTASH_REDIS_REST_URL &&
-                    process.env.UPSTASH_REDIS_REST_TOKEN
+                    process.env.KVROCKS_URL ||
+                    process.env.REDIS_URL ||
+                    (
+                      process.env.UPSTASH_REDIS_REST_URL &&
+                      process.env.UPSTASH_REDIS_REST_TOKEN
+                    )
                   )
                 )}>
                   <AutoSync />
