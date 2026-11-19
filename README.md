@@ -1,9 +1,4 @@
-[![Upstream Sync](https://github.com/sky06walker/KVideo/actions/workflows/Github_Upstream_Sync.yml/badge.svg)](https://github.com/sky06walker/KVideo/actions/workflows/Github_Upstream_Sync.yml)
-
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/KuekHaoYang/KVideo)
-
-# Buy Me A Coffee
-[![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=kuekhaoyang&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/kuekhaoyang)
 
 # 视频聚合平台 (KVideo)
 
@@ -11,7 +6,7 @@
 
 > 一个基于 Next.js 16 构建的现代化视频聚合播放平台。采用独特的 "Liquid Glass" 设计语言，提供流畅的视觉体验和强大的视频搜索功能。
 
-**在线体验：[https://kvideo.pages.dev/](https://kvideo.pages.dev/)**
+> **本仓库定制版**：使用 Docker Compose 部署，应用与 Kvrocks 一起运行；首页提供精品推荐，导航与分类逻辑对齐 LunaTV；播放器支持进度条缩略图预览。
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.1-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.2-blue?style=for-the-badge&logo=react)](https://react.dev/)
@@ -40,6 +35,7 @@
 ### 智能视频播放
 
 - **HLS 流媒体支持**：基于 [hls.js](https://github.com/video-dev/hls.js/) 原生支持 HLS (.m3u8) 格式，提供流畅的视频播放体验
+- **进度条缩略图预览**：鼠标悬停进度条时，按目标时间点实时抽帧显示画面预览
 - **播放控制**：完整的播放控制功能，包括进度条、音量控制、播放速度调节、全屏模式等
 - **自动跳过片头/片尾**：可设置自动跳过片头和片尾的秒数
 - **自动连播**：支持自动播放下一集
@@ -54,9 +50,8 @@
 
 ### 多源并行搜索
 
-- **聚合搜索引擎**：同时在多个视频源中并行搜索，通过 Server-Sent Events (SSE) 实时返回结果
-- **自定义视频源**：支持添加、编辑和管理自定义视频源
-- **个人视频源**：非管理员用户可添加个人视频源，不影响其他用户（数据按用户隔离）
+- **聚合搜索引擎**：同时在多个全局视频源中并行搜索，通过 Server-Sent Events (SSE) 实时返回结果
+- **全局视频源**：视频源由管理员在设置中统一维护，所有用户共享，源名称显示为后台填写的名称
 - **订阅源管理**：支持通过 JSON 链接批量导入和自动更新视频源
 - **JSON 批量导入**：在导入设置中直接粘贴 JSON 数组格式的视频源进行批量添加
 - **智能解析**：统一的解析器系统，自动处理不同源的数据格式
@@ -72,6 +67,15 @@
 - **搜索取消**：搜索进行中可随时点击"取消"按钮终止搜索，释放资源
 - **内容类目过滤**：在设置中添加屏蔽关键词（如"伦理"），匹配类目的视频将自动从搜索结果中过滤
 - **搜索性能优化**：服务端支持客户端断开检测（AbortSignal），每源超时保护，总结果数上限，防止内存溢出
+
+### 首页与分类浏览
+
+- **精品推荐**：首页横向展示热门电影、热门剧集、热门综艺、热门短剧，支持「查看更多」跳转对应分类页
+- **统一导航**：精品推荐、源浏览器、电影、剧集、短剧、动漫、综艺、直播合并为一排胶囊导航
+- **豆瓣分类页**：支持类型、地区、年代、排序筛选和标签切换，分页加载
+- **短剧频道**：按源分类浏览短剧，展示集数与更新状态
+- **源浏览器**：按全局视频源的真实分类浏览，分类标签完全以源返回为准，支持页码跳转
+- **海报直达播放**：源浏览器中的海报点击后在新窗口打开播放页
 
 ### 多线路折叠
 
@@ -91,7 +95,7 @@
 - **频道网格**：按分组展示频道，支持分页浏览，大列表搜索优化
 - **多级频道列表**：播放器内按源分组 → 按分类分组 → 频道的三级列表导航
 - **多线路折叠**：频道多线路默认显示前 3 条，可点击展开查看全部
-- **自动切源**：当视频源不可用时，自动选择延迟最低的可用源
+- **线路合并与自动切换**：按 `tvg-id` 将同一频道的多条线路合并，播放失败或超时时自动尝试下一条线路
 - **自定义请求头**：自动解析 M3U 中的 `http-user-agent` 和 `http-referrer` 属性，通过代理传递
 - **User-Agent 智能代理**：当频道指定自定义 User-Agent 时，自动走代理路径避免浏览器限制，解决 CCTV 等频道仅有声音无画面的问题
 - **流媒体代理**：内置 HLS 流代理，自动处理 CORS 问题和 M3U8 URL 重写
@@ -100,7 +104,7 @@
 - **超时保护**：15 秒请求超时、30 秒加载超时、20 秒分片加载超时、3 次清单重试
 - **逐源频道缓存**：每个 IPTV 源的频道独立缓存，避免重复加载
 - **并发控制**：最多同时拉取 3 个源，防止网络拥堵
-- **权限控制**：通过 `iptv_access` 权限控制谁可以访问 IPTV 功能
+- **权限控制**：登录用户可访问 IPTV 功能
 - **键盘快捷键**：播放器内支持空格暂停/继续、F 全屏、M 静音、方向键调节音量等
 - **搜索优化**：播放器内搜索使用 `useTransition` 非阻塞渲染，避免大列表卡顿
 
@@ -109,7 +113,7 @@
 - **电影 & 电视剧分类**：支持在电影和电视剧之间无缝切换，方便查找不同类型的影视资源
 - **详细影视信息**：自动获取豆瓣评分、演员阵容、剧情简介等详细信息
 - **推荐系统**：基于豆瓣数据的相关推荐
-- **自定义标签管理**：支持拖拽排序的标签管理器，自定义首页推荐分类
+- **豆瓣数据与图片代理**：可配置数据代理与图片代理线路，并支持豆瓣认证 Cookies
 - **可点击演员/导演**：播放页面的演员、导演名字可直接点击搜索其他作品
 
 ### 个性化推荐
@@ -179,25 +183,16 @@
 
 ### 跨设备配置同步
 
-解决 iOS Safari「添加到主屏幕」后 PWA 与浏览器之间 localStorage 不共享的问题（[#119](https://github.com/KuekHaoYang/KVideo/issues/119)），同时实现多设备配置共享（[#115](https://github.com/KuekHaoYang/KVideo/issues/115)）。
+用户配置、收藏、观看历史等数据统一存储在服务端 Kvrocks 中，按登录账户隔离，多设备访问同一账户即可自动同步。
 
 **工作原理：**
 
-1. **服务端存储（Upstash Redis）**：用户配置通过 `/api/user/config` API 存储在 Upstash Redis 中，使用 `user:config:{profileId}` 作为 key。Edge Runtime 兼容，Cloudflare Pages / Vercel 均可部署。
-2. **自动拉取（Pull）**：应用加载时，`useConfigSync` hook 从服务端拉取配置，与本地 `updatedAt` 时间戳比较——服务端更新时自动合并到本地。
-3. **自动推送（Push）**：本地设置变更后，自动延迟 3 秒推送到服务端（防抖），避免频繁写入。
-4. **同步范围**：视频源 (`sources`)、高级源 (`premiumSources`)、订阅列表 (`subscriptions`)、屏蔽分类 (`blockedCategories`)、排序偏好 (`sortBy`)、语言 (`locale`)。
-5. **数据隔离**：按 `profileId`（SHA-256 哈希）隔离，不同账户互不影响。
+1. **服务端存储（Kvrocks）**：用户数据通过 `/api/user/data` 按账户命名空间写入 Kvrocks，连接地址由 `KVROCKS_URL` 配置，同时兼容 Upstash Redis。
+2. **自动同步**：应用加载时从服务端拉取数据，本地变更后自动推送（防抖），避免频繁写入。
+3. **同步范围**：收藏、观看历史、播放进度、播放器设置、显示设置、弹幕设置、搜索历史等。
+4. **全局配置**：视频源、订阅、豆瓣/Bangumi 代理配置由管理员统一维护，存储在同一 Kvrocks 实例中。
 
-**使用前提：**
-
-- 需配置 Upstash Redis 环境变量（`UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN`），与观看历史/收藏同步共用同一 Redis 实例。
-- 未配置 Redis 时，配置同步功能静默降级——应用正常运行，仅本地存储生效。
-
-**典型场景：**
-
-- 电脑浏览器配置了视频源 → 手机打开同一实例 → 自动拉取到相同配置
-- iOS Safari「添加到主屏幕」后打开 PWA → 自动从 Redis 同步配置，无需重新设置
+**数据隔离：** 每个账户的数据互不可见；全局配置仅管理员可修改。
 
 ### 无障碍设计
 
@@ -243,144 +238,37 @@
 - **JSON 批量导入**：支持粘贴 JSON 数组格式的视频源进行批量导入
 - **滚动位置记忆**：退出或刷新页面后，自动恢复到之前的滚动位置
 - **返回顶部**：一键返回页面顶部
-- **数据隔离**：多账户场景下，所有用户数据（历史、收藏、设置、个人源）按 profileId 完全隔离
+- **数据隔离**：所有用户数据（历史、收藏、设置）按账户完全隔离，统一存储在 Kvrocks
 
 ## 隐私保护
 
-本应用注重用户隐私：
-
-- **本地存储**：所有数据存储在本地浏览器中
-- **无服务器数据**：不收集或上传任何用户数据
-- **自定义源**：用户可自行配置视频源
-- **数据隔离**：多账户场景下，每个用户的数据（历史、收藏、设置、个人源）完全隔离
-- **Profile ID**：基于密码的 SHA-256 哈希生成唯一用户标识，密码不可逆推
+- **数据自托管**：所有数据存储在你自己的 Kvrocks 实例中，不依赖第三方服务
+- **账户隔离**：收藏、历史、播放记录、设置等按账户独立存储
+- **全局配置**：视频源与代理配置由管理员统一维护，普通用户只读使用
+- **最小化本地数据**：浏览器仅保留必要的界面偏好与会话 Cookie
 
 ## 账户与访问控制
 
-KVideo 现在支持两套认证模式：
+应用采用服务端账户认证，登录状态由签名的 HTTP-only 会话 Cookie 维护。登录后才能访问收藏、观看历史、设置等需要身份的数据。
 
-- **托管账户模式（推荐）**：配置 `AUTH_SECRET` + Upstash Redis 后，登录改为 **用户名 + 密码**，超级管理员可直接在设置页创建、修改、重置和删除账户。
-- **环境变量模式（兼容旧部署）**：未启用托管账户时，继续使用 `ADMIN_PASSWORD` / `ACCESS_PASSWORD` / `ACCOUNTS` 进行密码登录。
+### 访问范围
 
-### 方式一：托管账户模式（推荐）
+- **普通用户**：搜索、播放、收藏、历史、IPTV、源浏览器等全部内容功能
+- **管理员**：在后台管理全局视频源、订阅、账户，以及豆瓣 / Bangumi 元数据代理配置
+- 账户数据按账户隔离，统一存储在 Kvrocks
 
-启用条件：
+### 部署配置
 
-- 配置 `AUTH_SECRET`
-- 配置 `UPSTASH_REDIS_REST_URL`
-- 配置 `UPSTASH_REDIS_REST_TOKEN`
-- （可选）配置 `MANAGED_AUTH_ENABLED=true` 强制优先使用托管账户模式
+管理员账户在首次启动时由部署环境提供的凭据初始化；`AUTH_SECRET` 用于会话签名，必须设置为足够长的随机字符串。相关变量存放在仓库根目录的 `.env` 中，由 Docker Compose 读取，不要将真实凭据提交到仓库。
 
-启用后：
+| 变量名 | 说明 |
+|--------|------|
+| `AUTH_SECRET` | 会话签名密钥，必填 |
+| `ADMIN_USERNAME` | 初始管理员用户名，可选 |
+| `ADMIN_PASSWORD` | 初始管理员密码，首次启动必填 |
+| `ALLOW_REGISTRATION` | 是否开放注册页 |
 
-- 主登录页使用 **用户名 + 密码**
-- 服务端使用 HTTP-only 签名会话 Cookie 作为认证真源
-- 超级管理员可在设置页直接管理账户和权限
-- 配置同步、历史、收藏等跨设备数据会按登录账户自动隔离
-
-> **强制优先托管模式**：设置 `MANAGED_AUTH_ENABLED=true` 只会改变认证模式选择，不会跳过 `AUTH_SECRET` 和 Redis 检查。缺少 `AUTH_SECRET`、`UPSTASH_REDIS_REST_URL` 或 `UPSTASH_REDIS_REST_TOKEN` 时，托管账户模式仍不会启用。
-首次启用时，如果 Redis 里还没有账户，会自动使用 `ADMIN_PASSWORD` 和 `ACCOUNTS` 作为引导种子创建首批托管账户。
-
-### 方式二：单管理员密码（环境变量模式）
-
-通过 `ADMIN_PASSWORD` 环境变量设置管理员密码：
-
-```bash
-# Docker
-docker run -d -p 3000:3000 -e ADMIN_PASSWORD=your_password --name kvideo kuekhaoyang/kvideo:latest
-```
-
-登录后自动获得超级管理员权限，可管理所有设置。
-
-> **向后兼容**：`ACCESS_PASSWORD` 环境变量仍然有效，当 `ADMIN_PASSWORD` 未设置时，`ACCESS_PASSWORD` 将作为管理员密码使用。
-
-### 方式三：多账户系统（环境变量模式）
-
-通过 `ACCOUNTS` 环境变量配置多个账户，每个账户拥有独立的数据空间（收藏、历史、设置、个人源等）。
-
-**兼容格式：**
-
-- 旧格式：`密码:名称[:角色[:权限1|权限2|...]]`
-- 新格式：`用户名:密码:名称[:角色[:权限1|权限2|...]]`
-
-多个账户之间用逗号分隔。
-
-- **角色**：`super_admin`（超级管理员）、`admin`（管理员）或 `viewer`（观众，默认）
-- **权限**（可选）：使用 `|` 分隔，为该账户添加其角色之外的额外权限
-
-```bash
-# 基本用法
-docker run -d -p 3000:3000 \
-  -e ACCOUNTS="pass1:张三:admin,pass2:李四:viewer,pass3:王五" \
-  --name kvideo kuekhaoyang/kvideo:latest
-
-# 为观众添加额外权限（如 IPTV 访问和源管理）
-docker run -d -p 3000:3000 \
-  -e ACCOUNTS="pass1:张三:admin,pass2:李四:viewer:iptv_access|source_management" \
-  --name kvideo kuekhaoyang/kvideo:latest
-```
-
-**特点：**
-- 每个账户拥有独立的收藏、历史、设置和个人视频源数据
-- 可同时配置 `ADMIN_PASSWORD`（作为超级管理员入口）
-- 支持为任何角色添加额外的自定义权限
-
-### 角色与权限
-
-| 权限 | 说明 | super_admin | admin | viewer |
-|------|------|:-----------:|:-----:|:------:|
-| `source_management` | 管理系统视频源 | ✓ | - | - |
-| `account_management` | 查看账户列表 | ✓ | - | - |
-| `danmaku_api` | 配置系统弹幕 API | ✓ | - | - |
-| `data_management` | 导出/导入/重置数据 | ✓ | - | - |
-| `player_settings` | 播放器设置 | ✓ | ✓ | - |
-| `danmaku_appearance` | 弹幕外观设置 | ✓ | ✓ | - |
-| `view_settings` | 显示设置 | ✓ | ✓ | ✓ |
-| `iptv_access` | 访问 IPTV 功能 | ✓ | ✓ | - |
-
-> 通过 ACCOUNTS 的第 4 个字段，可以为任何角色添加上表中的额外权限。例如让观众也能访问 IPTV：`password:name:viewer:iptv_access`
-
-### 个人视频源与弹幕 API
-
-所有已登录的用户（包括观众）都可以：
-
-- **添加个人视频源**：在设置页面添加自己的视频源，仅对自己可见，不影响其他用户
-- **管理弹幕 API**：添加多个弹幕 API 端点，选择当前使用的 API（优先于系统默认）
-
-这些数据按用户 profileId 隔离存储，切换账户后自动加载对应的个人配置。
-
-> 说明：旧环境变量模式下仍然支持“仅输入密码”登录；托管账户模式下则统一改为“用户名 + 密码”登录。
-
-### 方式四：高级内容独立密码
-
-通过 `PREMIUM_PASSWORD` 环境变量为高级内容（`/premium`）设置独立的访问密码，实现与主密码的分离控制。
-
-适合场景：给家人分享普通密码，但高级内容需要额外密码才能访问。
-
-```bash
-# Docker
-docker run -d -p 3000:3000 \
-  -e ADMIN_PASSWORD="admin123" \
-  -e PREMIUM_PASSWORD="premium456" \
-  --name kvideo kuekhaoyang/kvideo:latest
-```
-
-**特点：**
-- 访问 `/premium` 页面时需输入此专用密码
-- 管理员密码和 admin/super_admin 账号也可以解锁高级内容
-- 密码仅在当前浏览器会话有效，关闭浏览器后需重新输入
-- 不设置此变量时，高级内容无额外密码保护
-
-### 方式五：会话持久化设置
-
-通过 `PERSIST_SESSION` 环境变量控制用户登录后是否在设备上记住会话：
-
-| 变量名 | 选项 | 说明 | 默认值 |
-|--------|------|------|--------|
-| `PERSIST_SESSION` | `true` / `false` | 是否在本地浏览器持久化保存登录状态。设置为 `true` 时，用户只需登录一次，后续访问无需再次登录。 | `true` |
-
-> [!NOTE]
-> 此功能仅在设置了 `ADMIN_PASSWORD`、`ACCESS_PASSWORD` 或 `ACCOUNTS` 时才会生效。
+> `.env` 已被 `.gitignore` 忽略；仓库中的 `docker-compose.yml` 只引用变量，不包含任何凭据。
 
 ## 站点名称自定义配置
 
@@ -433,7 +321,7 @@ Docker 预构建镜像支持在运行时替换图标，无需重新构建镜像�
 
 **Docker 挂载文件（推荐）：**
 ```bash
-docker run -d -p 3000:3000 \
+docker run -d -p 3001:3000 \
   -v /path/to/icon.png:/app/custom/icon.png:ro \
   -e SITE_ICON_FILE=/app/custom/icon.png \
   --name kvideo kuekhaoyang/kvideo:latest
@@ -441,14 +329,14 @@ docker run -d -p 3000:3000 \
 
 **Docker 使用 URL：**
 ```bash
-docker run -d -p 3000:3000 \
+docker run -d -p 3001:3000 \
   -e SITE_ICON_URL="https://example.com/icon.png" \
   --name kvideo kuekhaoyang/kvideo:latest
 ```
 
 **Docker 使用站内路径：**
 ```bash
-docker run -d -p 3000:3000 \
+docker run -d -p 3001:3000 \
   -e SITE_ICON_URL="/placeholder-poster.svg" \
   --name kvideo kuekhaoyang/kvideo:latest
 ```
@@ -474,7 +362,7 @@ SUBSCRIPTION_SOURCES='https://example.com/api.json,https://backup.com/api.json'
 **Docker 部署：**
 
 ```bash
-docker run -d -p 3000:3000 -e SUBSCRIPTION_SOURCES='[{"name":"MySource","url":"..."}]' --name kvideo kuekhaoyang/kvideo:latest
+docker run -d -p 3001:3000 -e SUBSCRIPTION_SOURCES='[{"name":"MySource","url":"..."}]' --name kvideo kuekhaoyang/kvideo:latest
 ```
 
 **Vercel 部署：**
@@ -505,7 +393,7 @@ docker run -d -p 3000:3000 -e SUBSCRIPTION_SOURCES='[{"name":"MySource","url":".
 AD_KEYWORDS="ad,sponsor,preroll,midroll"
 
 # Docker 挂载文件方式
-docker run -d -p 3000:3000 \
+docker run -d -p 3001:3000 \
   -v /path/to/keywords.txt:/app/keywords.txt \
   -e AD_KEYWORDS_FILE=/app/keywords.txt \
   --name kvideo kuekhaoyang/kvideo:latest
@@ -525,7 +413,7 @@ docker run -d -p 3000:3000 \
 
 ```bash
 # Docker
-docker run -d -p 3000:3000 \
+docker run -d -p 3001:3000 \
   -e NEXT_PUBLIC_DANMAKU_API_URL="https://your-danmu-api.example.com" \
   --name kvideo kuekhaoyang/kvideo:latest
 ```
@@ -548,7 +436,7 @@ docker run -d -p 3000:3000 \
 
 ```bash
 # Docker
-docker run -d -p 3000:3000 \
+docker run -d -p 3001:3000 \
   -e VIDEOTOGETHER_SCRIPT_URL="https://your-domain.example.com/extension.website.user.js" \
   -e VIDEOTOGETHER_SETTING_URL="https://your-domain.example.com/videotogether-settings.html" \
   --name kvideo kuekhaoyang/kvideo:latest
@@ -718,13 +606,11 @@ ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `AUTH_SECRET` | 托管账户模式的会话签名密钥；启用 Redis 托管账户时必填 | - |
-| `MANAGED_AUTH_ENABLED` | 设为 `true` 时强制优先使用托管账户模式；仍要求 `AUTH_SECRET` 和 Upstash Redis 配置完整 | - |
-| `ADMIN_PASSWORD` | 管理员密码；环境变量模式直接生效，也可作为托管模式首次引导的超级管理员种子 | - |
-| `ACCESS_PASSWORD` | 访问密码（向后兼容，等同于 `ADMIN_PASSWORD`） | - |
-| `ACCOUNTS` | 多账户配置；支持 `密码:名称[:角色[:权限1\|权限2]]` 和 `用户名:密码:名称[:角色[:权限1\|权限2]]` 两种格式 | - |
-| `PREMIUM_PASSWORD` | 高级内容独立密码，访问 `/premium` 时需输入 | - |
-| `PERSIST_SESSION` | 是否持久化登录会话 | `true` |
+| `AUTH_SECRET` | 会话签名密钥，必填 | - |
+| `ADMIN_USERNAME` | 初始管理员用户名 | - |
+| `ADMIN_PASSWORD` | 初始管理员密码，首次启动必填 | - |
+| `ALLOW_REGISTRATION` | 是否开放注册页 | `true` |
+| `KVROCKS_URL` | Kvrocks / Redis 连接地址 | `redis://kvideo-kvrocks:6666` |
 | `PORT` | 自定义应用端口 | `3000` |
 | `ALLOW_LAN_ACCESS` / `NEXT_PUBLIC_ALLOW_LAN_ACCESS` | 允许同局域网设备通过当前设备 IP 访问本机开发或传统 Node.js 自托管服务 | `false` |
 | `LAN_ALLOWED_DEV_ORIGINS` / `NEXT_PUBLIC_LAN_ALLOWED_DEV_ORIGINS` | 追加 Next.js 开发模式允许访问 dev 资源的主机名或通配符 | - |
@@ -743,8 +629,6 @@ ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run
 | `VIDEOTOGETHER_ENABLED` | 是否允许 VideoTogether 一起看集成（`false` 时关闭） | `true` |
 | `VIDEOTOGETHER_SCRIPT_URL` | VideoTogether 脚本地址 | `https://fastly.jsdelivr.net/gh/VideoTogether/VideoTogether@latest/release/extension.website.user.js` |
 | `VIDEOTOGETHER_SETTING_URL` | VideoTogether 设置页地址 | - |
-| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST URL（跨设备同步：配置、历史、收藏） | - |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST Token | - |
 
 ## 技术栈
 
@@ -752,8 +636,8 @@ ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| **[Next.js](https://nextjs.org/)** | 16.1.7 | React 框架，使用 App Router |
-| **[React](https://react.dev/)** | 19.2.4 | UI 组件库 |
+| **[Next.js](https://nextjs.org/)** | 16.4.6 | React 框架，使用 App Router |
+| **[React](https://react.dev/)** | 19.3.1 | UI 组件库 |
 | **[TypeScript](https://www.typescriptlang.org/)** | 5.x | 类型安全的 JavaScript |
 | **[Tailwind CSS](https://tailwindcss.com/)** | 4.x | 实用优先的 CSS 框架 |
 | **[Zustand](https://github.com/pmndrs/zustand)** | 5.x | 轻量级状态管理 |
@@ -777,7 +661,7 @@ ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run
 - **Server Components**：优化首屏加载性能
 - **Client Components**：复杂交互和状态管理
 - **Edge Runtime**：API 路由运行在 Edge Runtime 上，提供更低延迟
-- **Profile-based Storage**：所有用户数据按 profileId（SHA-256 哈希）隔离存储
+- **Profile-based Storage**：所有用户数据按账户隔离存储，统一持久化到 Kvrocks
 
 ## 部署合规说明
 
@@ -797,57 +681,27 @@ Issue [#127](https://github.com/KuekHaoYang/KVideo/issues/127) 之后，仓库�
 
 ### 部署到自己的服务器
 
-#### 选项 1：Docker 部署（推荐，完整功能）
-
-**从 Docker Hub 拉取（最简单）：**
+#### 选项 1：Docker Compose 部署（推荐，完整功能）
 
 ```bash
-# 拉取最新版本
-docker pull kuekhaoyang/kvideo:latest
-docker run -d -p 3000:3000 --name kvideo kuekhaoyang/kvideo:latest
-```
-
-应用将在 `http://localhost:3000` 启动。
-
-> **多架构支持**：镜像支持 2 种主流平台架构：
-> - `linux/amd64` - Intel/AMD 64位（大多数服务器、PC、Intel Mac）
-> - `linux/arm64` - ARM 64位（Apple Silicon Mac、AWS Graviton、树莓派 4/5）
-
-**自己构建镜像：**
-
-```bash
-git clone https://github.com/KuekHaoYang/KVideo.git
+git clone https://github.com/xiaotian-zz/KVideo.git
 cd KVideo
-docker build -t kvideo .
-docker run -d -p 3000:3000 --name kvideo kvideo
+
+# 在仓库根目录创建 .env，填入 AUTH_SECRET、ADMIN_USERNAME、ADMIN_PASSWORD 等变量
+docker compose up -d --build
 ```
 
-**使用 Docker Compose：**
+应用与 Kvrocks 会一起启动：应用默认访问 `http://localhost:3001`，Kvrocks 映射到 `6666`，数据保存在 `kvrocks-data` 卷中。
 
-```bash
-docker-compose up -d
-```
+`docker-compose.yml` 只引用环境变量，不包含任何凭据；`.env` 已被 `.gitignore` 忽略，请勿提交。
 
-**完整配置示例（Docker）：**
-
-```bash
-docker run -d -p 3000:3000 \
-  -e ADMIN_PASSWORD="admin123" \
-  -e PREMIUM_PASSWORD="premium456" \
-  -e ACCOUNTS="user1:用户一:admin,user2:用户二:viewer:iptv_access" \
-  -e NEXT_PUBLIC_SITE_NAME="我的视频" \
-  -e NEXT_PUBLIC_DANMAKU_API_URL="https://danmaku.example.com" \
-  -e SUBSCRIPTION_SOURCES='[{"name":"默认源","url":"https://example.com/sources.json"}]' \
-  -e IPTV_SOURCES='[{"name":"央视","url":"https://example.com/cctv.m3u"}]' \
-  -e MERGE_SOURCES=true \
-  --name kvideo kuekhaoyang/kvideo:latest
-```
+> **镜像架构**：如需自行构建镜像，Dockerfile 支持 `linux/amd64` 与 `linux/arm64`。
 
 #### 选项 2：传统 Node.js 部署（完整功能）
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/KuekHaoYang/KVideo.git
+git clone https://github.com/xiaotian-zz/KVideo.git
 cd KVideo
 
 # 2. 安装依赖
@@ -860,7 +714,7 @@ npm run build
 npm start
 ```
 
-应用将在 `http://localhost:3000` 启动。
+应用将在 `http://localhost:3001` 启动。
 
 同一局域网设备需要直接访问当前设备 IP 时，使用 `ALLOW_LAN_ACCESS=true npm run start`，并确认系统防火墙允许入站访问对应端口。
 
@@ -986,21 +840,16 @@ npm run pages:build
 
 然后使用 Direct Upload 或 CLI 发布 **`.vercel/output/static`**。不要上传仓库根目录，也不要上传 `.next`，否则 Pages 只会托管源码文件，访问站点时直接 404。
 
-### Docker 部署
+### Docker Compose 部署
 
-当有新版本发布时：
+拉取代码更新后重新构建：
 
 ```bash
-# 停止并删除旧容器
-docker stop kvideo
-docker rm kvideo
-
-# 拉取最新镜像
-docker pull kuekhaoyang/kvideo:latest
-
-# 运行新容器
-docker run -d -p 3000:3000 --name kvideo kuekhaoyang/kvideo:latest
+git pull origin main
+docker compose up -d --build
 ```
+
+数据保存在 `kvrocks-data` 卷中，重建容器不会影响已有账户、收藏与观看历史。
 
 ### Node.js 部署
 
