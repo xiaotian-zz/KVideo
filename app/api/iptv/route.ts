@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         'Cache-Control': 'public, max-age=300', // Cache for 5 minutes
       },
     });
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch M3U playlist' },
       { status: 500 }

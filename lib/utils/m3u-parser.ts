@@ -390,8 +390,37 @@ export function parseM3U(content: string, baseUrl?: string): M3UPlaylist {
     if (jsonResult) return jsonResult;
   }
 
+  // 同一 tvg-id 的多个条目视为同一频道的不同线路，合并到 routes
+  const mergedChannels: M3UChannel[] = [];
+  const channelsByTvgId = new Map<string, M3UChannel>();
+
+  for (const channel of channels) {
+    const tvgIdKey = channel.tvgId?.trim().toLowerCase();
+    if (!tvgIdKey) {
+      mergedChannels.push(channel);
+      continue;
+    }
+
+    const existing = channelsByTvgId.get(tvgIdKey);
+    if (!existing) {
+      const mergedChannel: M3UChannel = {
+        ...channel,
+        routes: [channel.url],
+      };
+      channelsByTvgId.set(tvgIdKey, mergedChannel);
+      mergedChannels.push(mergedChannel);
+      continue;
+    }
+
+    const routes = existing.routes || [existing.url];
+    if (!routes.includes(channel.url)) {
+      routes.push(channel.url);
+    }
+    existing.routes = routes;
+  }
+
   return {
-    channels,
+    channels: mergedChannels,
     groups: Array.from(groupSet).sort(),
   };
 }

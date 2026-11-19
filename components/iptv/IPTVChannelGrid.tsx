@@ -6,6 +6,7 @@
  */
 
 import { useState, useMemo } from 'react';
+import Image from 'next/image';
 import { Icons } from '@/components/ui/Icon';
 import type { M3UChannel } from '@/lib/utils/m3u-parser';
 import type { IPTVSource } from '@/lib/store/iptv-store';
@@ -191,12 +192,15 @@ export function IPTVChannelGrid({ channels, groups, onSelect, activeChannel, cha
           >
             <div className="flex items-center gap-2">
               {channel.logo ? (
-                <img
+                <Image
                   src={channel.logo}
                   alt=""
+                  width={32}
+                  height={32}
+                  unoptimized
                   className="w-8 h-8 rounded object-contain bg-black/10 flex-shrink-0"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
+                    e.currentTarget.style.display = 'none';
                   }}
                 />
               ) : (

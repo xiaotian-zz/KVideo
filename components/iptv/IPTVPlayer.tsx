@@ -117,6 +117,10 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
   // Get current route URL
   const routes = channel.routes || [channel.url];
   const currentUrl = routes[currentRouteIndex] || channel.url;
+  const routesRef = useRef(routes);
+  const routeIndexRef = useRef(currentRouteIndex);
+  routesRef.current = routes;
+  routeIndexRef.current = currentRouteIndex;
 
   // Route display - collapse if > MAX_VISIBLE_ROUTES
   const visibleRoutes = showAllRoutes ? routes : routes.slice(0, MAX_VISIBLE_ROUTES);
@@ -134,20 +138,24 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
       setSeekStepSeconds(settingsStore.getSettings().seekStepSeconds ?? DEFAULT_SEEK_STEP_SECONDS);
     };
 
-    syncSeekStep();
+    // 挂载后再同步存储值，避免 effect 内同步 setState
+    queueMicrotask(syncSeekStep);
     const unsubscribe = settingsStore.subscribe(syncSeekStep);
     return () => unsubscribe();
   }, []);
 
   // Auto-expand the source/group containing the active channel
-  useEffect(() => {
+  const [prevChannelExpandKey, setPrevChannelExpandKey] = useState(`${channel.sourceId}|${channel.group}`);
+  const channelExpandKey = `${channel.sourceId}|${channel.group}`;
+  if (channelExpandKey !== prevChannelExpandKey) {
+    setPrevChannelExpandKey(channelExpandKey);
     if (channel.sourceId) {
       setExpandedSources(prev => new Set(prev).add(channel.sourceId!));
       if (channel.group) {
         setExpandedGroups(prev => new Set(prev).add(`${channel.sourceId}::${channel.group}`));
       }
     }
-  }, [channel.sourceId, channel.group]);
+  }
 
   // Track fullscreen changes
   useEffect(() => {
@@ -270,6 +278,14 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
         clearTimeout(loadingTimeoutRef.current);
         loadingTimeoutRef.current = undefined;
       }
+
+      // 当前线路失败时，自动尝试同频道的下一条线路
+      const nextRouteIndex = routeIndexRef.current + 1;
+      if (nextRouteIndex < routesRef.current.length) {
+        setCurrentRouteIndex(nextRouteIndex);
+        return;
+      }
+
       setIsLoading(false);
       setError(msg);
     };
@@ -448,10 +464,13 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
   }, [currentUrl, loadChannel]);
 
   // Reset route index when channel changes
-  useEffect(() => {
+  const [prevRouteResetKey, setPrevRouteResetKey] = useState(`${channel.name}|${channel.url}`);
+  const routeResetKey = `${channel.name}|${channel.url}`;
+  if (routeResetKey !== prevRouteResetKey) {
+    setPrevRouteResetKey(routeResetKey);
     setCurrentRouteIndex(0);
     setShowAllRoutes(false);
-  }, [channel.name, channel.url]);
+  }
 
   // Playback controls
   const togglePlay = () => {
