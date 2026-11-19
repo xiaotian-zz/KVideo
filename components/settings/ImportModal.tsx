@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ImportModalTabs } from './import/ImportModalTabs';
 import { FileImportTab } from './import/FileImportTab';
 import { LinkImportTab } from './import/LinkImportTab';
@@ -36,12 +36,14 @@ export function ImportModal({
 }: ImportModalProps) {
   const [activeTab, setActiveTab] = useState<'file' | 'link' | 'subscription' | 'json'>('file');
 
-  // Reset tab on open
-  useEffect(() => {
+  // 打开时在渲染阶段重置标签页
+  const [prevOpen, setPrevOpen] = useState(isOpen);
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen);
     if (isOpen) {
       setActiveTab('file');
     }
-  }, [isOpen]);
+  }
 
   if (!isOpen) return null;
 

@@ -14,15 +14,15 @@ test('popular features do not render the hardcoded quick search groups', () => {
   assert.doesNotMatch(source, /CategoryQuickSearch/);
 });
 
-test('popular tag management mode stays out of discovery grids', () => {
+test('popular features only render featured recommendations', () => {
   const source = readFileSync(
     join(projectRoot, 'components/home/PopularFeatures.tsx'),
     'utf8',
   );
 
-  assert.match(source, /const isTagManagementMode = showTagManager;/);
-  assert.match(source, /!\s*isTagManagementMode && !effectiveRecommendSelected/);
-  assert.match(source, /!\s*isTagManagementMode && \(/);
+  assert.match(source, /FeaturedRecommendations/);
+  assert.doesNotMatch(source, /TagManager/);
+  assert.doesNotMatch(source, /showTagManager/);
 });
 
 test('tag management list uses wrapping chip layout instead of a horizontal search filter row', () => {

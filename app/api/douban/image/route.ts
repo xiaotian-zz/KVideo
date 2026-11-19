@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { buildDoubanImageCandidates } from '@/lib/server/douban-image';
+import {
+    buildDoubanImageUrl,
+    getMetadataConfig,
+} from '@/lib/server/metadata-proxy';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 const REQUEST_HEADERS = {
     'User-Agent':
@@ -10,12 +14,39 @@ const REQUEST_HEADERS = {
     Referer: 'https://movie.douban.com/',
 };
 
+function isValidHttpUrl(value: string): boolean {
+    try {
+        const url = new URL(value);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const imageUrl = searchParams.get('url');
 
     if (!imageUrl) {
         return NextResponse.json({ error: 'Missing image URL' }, { status: 400 });
+    }
+
+    const metadata = await getMetadataConfig();
+
+    // 除“服务器代理”外，其余模式直接跳转到配置的目标地址
+    if (metadata.doubanImageProxyType !== 'server') {
+        const targetUrl = buildDoubanImageUrl(imageUrl, metadata);
+
+        if (!isValidHttpUrl(targetUrl)) {
+            return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
+        }
+
+        return NextResponse.redirect(targetUrl, {
+            status: 302,
+            headers: {
+                'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+            },
+        });
     }
 
     let lastStatus = 502;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -12,12 +12,15 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
   const [includeSearchHistory, setIncludeSearchHistory] = useState(true);
   const [includeWatchHistory, setIncludeWatchHistory] = useState(true);
 
-  useEffect(() => {
+  // 打开时在渲染阶段重置选项
+  const [prevOpen, setPrevOpen] = useState(isOpen);
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen);
     if (isOpen) {
       setIncludeSearchHistory(true);
       setIncludeWatchHistory(true);
     }
-  }, [isOpen]);
+  }
 
   const handleExport = () => {
     onExport(includeSearchHistory, includeWatchHistory);

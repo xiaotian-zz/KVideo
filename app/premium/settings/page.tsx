@@ -7,7 +7,8 @@ import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
 import { AppVersionSettings } from '@/components/settings/AppVersionSettings';
 import { AccountSettings } from '@/components/settings/AccountSettings';
-import { AdminGate } from '@/components/AdminGate';
+import { MetadataSettings } from '@/components/settings/MetadataSettings';
+import { SettingsTabs } from '@/components/settings/SettingsTabs';
 import { usePremiumSettingsPage } from './hooks/usePremiumSettingsPage';
 import Link from 'next/link';
 
@@ -53,7 +54,6 @@ export default function PremiumSettingsPage() {
     } = usePremiumSettingsPage();
 
     return (
-        <AdminGate>
         <div className="min-h-screen bg-black">
             <div className="container mx-auto px-4 py-8 max-w-4xl space-y-8">
                 {/* Custom Header for Premium Settings */}
@@ -77,53 +77,85 @@ export default function PremiumSettingsPage() {
                     </div>
                 </div>
 
-                <AppVersionSettings />
-
-                {/* Account management and logout must remain available in premium mode. */}
-                <AccountSettings />
-
-                {/* Player Settings */}
-                <PlayerSettings
-                    fullscreenType={fullscreenType}
-                    onFullscreenTypeChange={handleFullscreenTypeChange}
-                    proxyMode={proxyMode}
-                    onProxyModeChange={handleProxyModeChange}
-                    seekStepSeconds={seekStepSeconds}
-                    onSeekStepSecondsChange={handleSeekStepSecondsChange}
-                    danmakuApiUrl={danmakuApiUrl}
-                    onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
-                    danmakuOpacity={danmakuOpacity}
-                    onDanmakuOpacityChange={handleDanmakuOpacityChange}
-                    danmakuFontSize={danmakuFontSize}
-                    onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
-                    danmakuDisplayArea={danmakuDisplayArea}
-                    onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
-                />
-
-                {/* Display Settings */}
-                <DisplaySettings
-                    realtimeLatency={realtimeLatency}
-                    searchDisplayMode={searchDisplayMode}
-                    rememberScrollPosition={rememberScrollPosition}
-                    onRealtimeLatencyChange={handleRealtimeLatencyChange}
-                    onSearchDisplayModeChange={handleSearchDisplayModeChange}
-                    onRememberScrollPositionChange={handleRememberScrollPositionChange}
-                    locale={locale}
-                    onLocaleChange={handleLocaleChange}
-                    blockedCategories={blockedCategories}
-                    onBlockedCategoriesChange={handleBlockedCategoriesChange}
-                />
-
-                {/* Premium Source Management */}
-                <PremiumSourceSettings
-                    sources={premiumSources}
-                    onSourcesChange={handleSourcesChange}
-                    onRestoreDefaults={() => setIsRestoreDefaultsDialogOpen(true)}
-                    onAddSource={() => {
-                        setEditingSource(null);
-                        setIsAddModalOpen(true);
-                    }}
-                    onEditSource={handleEditSource}
+                <SettingsTabs
+                    tabs={[
+                        {
+                            id: 'account',
+                            label: '账户',
+                            content: <AccountSettings />,
+                        },
+                        {
+                            id: 'sources',
+                            label: '高级源',
+                            content: (
+                                <div className="space-y-4">
+                                    <p className="text-xs text-[var(--text-color-secondary)] px-1">
+                                        高级源由管理员统一维护，所有用户共用；保存后会写入 Kvrocks 并同步给全部用户。
+                                    </p>
+                                    <PremiumSourceSettings
+                                        sources={premiumSources}
+                                        onSourcesChange={handleSourcesChange}
+                                        onRestoreDefaults={() => setIsRestoreDefaultsDialogOpen(true)}
+                                        onAddSource={() => {
+                                            setEditingSource(null);
+                                            setIsAddModalOpen(true);
+                                        }}
+                                        onEditSource={handleEditSource}
+                                    />
+                                </div>
+                            ),
+                        },
+                        {
+                            id: 'metadata',
+                            label: '元数据',
+                            content: <MetadataSettings />,
+                        },
+                        {
+                            id: 'player',
+                            label: '播放器',
+                            content: (
+                                <PlayerSettings
+                                    fullscreenType={fullscreenType}
+                                    onFullscreenTypeChange={handleFullscreenTypeChange}
+                                    proxyMode={proxyMode}
+                                    onProxyModeChange={handleProxyModeChange}
+                                    seekStepSeconds={seekStepSeconds}
+                                    onSeekStepSecondsChange={handleSeekStepSecondsChange}
+                                    danmakuApiUrl={danmakuApiUrl}
+                                    onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
+                                    danmakuOpacity={danmakuOpacity}
+                                    onDanmakuOpacityChange={handleDanmakuOpacityChange}
+                                    danmakuFontSize={danmakuFontSize}
+                                    onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
+                                    danmakuDisplayArea={danmakuDisplayArea}
+                                    onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
+                                />
+                            ),
+                        },
+                        {
+                            id: 'display',
+                            label: '显示',
+                            content: (
+                                <DisplaySettings
+                                    realtimeLatency={realtimeLatency}
+                                    searchDisplayMode={searchDisplayMode}
+                                    rememberScrollPosition={rememberScrollPosition}
+                                    onRealtimeLatencyChange={handleRealtimeLatencyChange}
+                                    onSearchDisplayModeChange={handleSearchDisplayModeChange}
+                                    onRememberScrollPositionChange={handleRememberScrollPositionChange}
+                                    locale={locale}
+                                    onLocaleChange={handleLocaleChange}
+                                    blockedCategories={blockedCategories}
+                                    onBlockedCategoriesChange={handleBlockedCategoriesChange}
+                                />
+                            ),
+                        },
+                        {
+                            id: 'about',
+                            label: '关于',
+                            content: <AppVersionSettings />,
+                        },
+                    ]}
                 />
             </div>
 
@@ -149,6 +181,5 @@ export default function PremiumSettingsPage() {
                 onCancel={() => setIsRestoreDefaultsDialogOpen(false)}
             />
         </div>
-        </AdminGate>
     );
 }

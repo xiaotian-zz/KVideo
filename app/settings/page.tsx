@@ -12,9 +12,9 @@ import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { AppVersionSettings } from '@/components/settings/AppVersionSettings';
-import { UserSourceSettings } from '@/components/settings/UserSourceSettings';
 import { UserDanmakuSettings } from '@/components/settings/UserDanmakuSettings';
-import { PermissionGate } from '@/components/PermissionGate';
+import { MetadataSettings } from '@/components/settings/MetadataSettings';
+import { SettingsTabs } from '@/components/settings/SettingsTabs';
 import { hasPermission } from '@/lib/store/auth-store';
 import { useSettingsPage } from './hooks/useSettingsPage';
 
@@ -78,85 +78,110 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
       <div className="container mx-auto px-4 py-8 max-w-4xl space-y-8">
-        {/* Header */}
         <SettingsHeader />
 
-        <AppVersionSettings />
-
-        {/* Account Settings */}
-        <AccountSettings />
-
-        {/* Player Settings */}
-        <PermissionGate permission="player_settings">
-          <PlayerSettings
-            fullscreenType={fullscreenType}
-            onFullscreenTypeChange={handleFullscreenTypeChange}
-            proxyMode={proxyMode}
-            onProxyModeChange={handleProxyModeChange}
-            seekStepSeconds={seekStepSeconds}
-            onSeekStepSecondsChange={handleSeekStepSecondsChange}
-            videoTogetherEnabled={videoTogetherEnabled}
-            onVideoTogetherEnabledChange={handleVideoTogetherEnabledChange}
-            danmakuApiUrl={danmakuApiUrl}
-            onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
-            danmakuOpacity={danmakuOpacity}
-            onDanmakuOpacityChange={handleDanmakuOpacityChange}
-            danmakuFontSize={danmakuFontSize}
-            onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
-            danmakuDisplayArea={danmakuDisplayArea}
-            onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
-            showDanmakuApi={hasPermission('danmaku_api')}
-          />
-        </PermissionGate>
-
-        {/* Display Settings */}
-        <DisplaySettings
-          realtimeLatency={realtimeLatency}
-          searchDisplayMode={searchDisplayMode}
-          rememberScrollPosition={rememberScrollPosition}
-          onRealtimeLatencyChange={handleRealtimeLatencyChange}
-          onSearchDisplayModeChange={handleSearchDisplayModeChange}
-          onRememberScrollPositionChange={handleRememberScrollPositionChange}
-          locale={locale}
-          onLocaleChange={handleLocaleChange}
-          blockedCategories={blockedCategories}
-          onBlockedCategoriesChange={handleBlockedCategoriesChange}
+        <SettingsTabs
+          tabs={[
+            {
+              id: 'account',
+              label: '账户',
+              content: <AccountSettings />,
+            },
+            {
+              id: 'sources',
+              label: '视频源',
+              content: (
+                <div className="space-y-4">
+                  <p className="text-xs text-[var(--text-color-secondary)] px-1">
+                    视频源由管理员统一维护，所有用户共用；保存后会写入 Kvrocks 并同步给全部用户。
+                  </p>
+                  <SourceSettings
+                    sources={sources}
+                    onSourcesChange={handleSourcesChange}
+                    onRestoreDefaults={() => setIsRestoreDefaultsDialogOpen(true)}
+                    onAddSource={() => {
+                      setEditingSource(null);
+                      setIsAddModalOpen(true);
+                    }}
+                    onEditSource={handleEditSource}
+                  />
+                </div>
+              ),
+            },
+            {
+              id: 'metadata',
+              label: '元数据',
+              content: <MetadataSettings />,
+            },
+            {
+              id: 'player',
+              label: '播放器',
+              content: (
+                <PlayerSettings
+                  fullscreenType={fullscreenType}
+                  onFullscreenTypeChange={handleFullscreenTypeChange}
+                  proxyMode={proxyMode}
+                  onProxyModeChange={handleProxyModeChange}
+                  seekStepSeconds={seekStepSeconds}
+                  onSeekStepSecondsChange={handleSeekStepSecondsChange}
+                  videoTogetherEnabled={videoTogetherEnabled}
+                  onVideoTogetherEnabledChange={handleVideoTogetherEnabledChange}
+                  danmakuApiUrl={danmakuApiUrl}
+                  onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
+                  danmakuOpacity={danmakuOpacity}
+                  onDanmakuOpacityChange={handleDanmakuOpacityChange}
+                  danmakuFontSize={danmakuFontSize}
+                  onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
+                  danmakuDisplayArea={danmakuDisplayArea}
+                  onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
+                  showDanmakuApi={hasPermission('danmaku_api')}
+                />
+              ),
+            },
+            {
+              id: 'display',
+              label: '显示',
+              content: (
+                <div>
+                  <DisplaySettings
+                    realtimeLatency={realtimeLatency}
+                    searchDisplayMode={searchDisplayMode}
+                    rememberScrollPosition={rememberScrollPosition}
+                    onRealtimeLatencyChange={handleRealtimeLatencyChange}
+                    onSearchDisplayModeChange={handleSearchDisplayModeChange}
+                    onRememberScrollPositionChange={handleRememberScrollPositionChange}
+                    locale={locale}
+                    onLocaleChange={handleLocaleChange}
+                    blockedCategories={blockedCategories}
+                    onBlockedCategoriesChange={handleBlockedCategoriesChange}
+                  />
+                  <SortSettings sortBy={sortBy} onSortChange={handleSortChange} />
+                </div>
+              ),
+            },
+            {
+              id: 'danmaku',
+              label: '弹幕',
+              content: <UserDanmakuSettings />,
+            },
+            {
+              id: 'data',
+              label: '数据',
+              content: (
+                <DataSettings
+                  onExport={() => setIsExportModalOpen(true)}
+                  onImport={() => setIsImportModalOpen(true)}
+                  onReset={() => setIsResetDialogOpen(true)}
+                />
+              ),
+            },
+            {
+              id: 'about',
+              label: '关于',
+              content: <AppVersionSettings />,
+            },
+          ]}
         />
-
-        {/* Per-User Source Settings (visible to all logged-in users) */}
-        <UserSourceSettings />
-
-        {/* Per-User Danmaku Settings (visible to all logged-in users) */}
-        <UserDanmakuSettings />
-
-        {/* Source Management */}
-        <PermissionGate permission="source_management">
-          <SourceSettings
-            sources={sources}
-            onSourcesChange={handleSourcesChange}
-            onRestoreDefaults={() => setIsRestoreDefaultsDialogOpen(true)}
-            onAddSource={() => {
-              setEditingSource(null);
-              setIsAddModalOpen(true);
-            }}
-            onEditSource={handleEditSource}
-          />
-        </PermissionGate>
-
-        {/* Sort Options */}
-        <SortSettings
-          sortBy={sortBy}
-          onSortChange={handleSortChange}
-        />
-
-        {/* Data Management */}
-        <PermissionGate permission="data_management">
-          <DataSettings
-            onExport={() => setIsExportModalOpen(true)}
-            onImport={() => setIsImportModalOpen(true)}
-            onReset={() => setIsResetDialogOpen(true)}
-          />
-        </PermissionGate>
       </div>
 
       {/* Modals */}

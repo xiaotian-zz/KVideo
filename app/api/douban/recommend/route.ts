@@ -1,6 +1,22 @@
 import { NextResponse } from 'next/server';
+import {
+  buildDoubanDataUrl,
+  buildDoubanImageUrl,
+  buildDoubanRequestHeaders,
+  getMetadataConfig,
+} from '@/lib/server/metadata-proxy';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
+
+interface DoubanSubject {
+  cover?: string;
+  [key: string]: unknown;
+}
+
+interface DoubanSearchResponse {
+  subjects?: DoubanSubject[];
+  [key: string]: unknown;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -10,27 +26,34 @@ export async function GET(request: Request) {
   const type = searchParams.get('type') || 'movie'; // movie or tv
 
   try {
-    const url = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(tag)}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`;
+    const metadata = await getMetadataConfig();
+    const originalUrl = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(tag)}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`;
+    const targetUrl = buildDoubanDataUrl(originalUrl, metadata);
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Referer': 'https://movie.douban.com/',
-      },
+    let response = await fetch(targetUrl, {
+      headers: buildDoubanRequestHeaders(metadata),
       next: { revalidate: 3600 }, // Cache for 1 hour
     });
+
+    // 代理线路不可用时回退到豆瓣原始地址
+    if (!response.ok && targetUrl !== originalUrl) {
+      response = await fetch(originalUrl, {
+        headers: buildDoubanRequestHeaders(metadata),
+        next: { revalidate: 3600 },
+      });
+    }
 
     if (!response.ok) {
       throw new Error(`Douban API returned ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as DoubanSearchResponse;
 
-    // 转换图片链接使用代理
+    // 按全局图片代理配置转换封面地址
     if (data.subjects && Array.isArray(data.subjects)) {
-      data.subjects = data.subjects.map((item: any) => ({
+      data.subjects = data.subjects.map((item) => ({
         ...item,
-        cover: item.cover ? `/api/douban/image?url=${encodeURIComponent(item.cover)}` : item.cover,
+        cover: item.cover ? buildDoubanImageUrl(item.cover, metadata) : item.cover,
       }));
     }
 

@@ -10,6 +10,7 @@ import {
 } from '@/lib/store/settings-store';
 import { premiumModeSettingsStore, type ModeSettings } from '@/lib/store/premium-mode-settings';
 import type { VideoSource } from '@/lib/types';
+import { pushGlobalConfig } from '@/lib/utils/global-config-client';
 
 export function usePremiumSettingsPage() {
     const [premiumSources, setPremiumSources] = useState<VideoSource[]>([]);
@@ -75,6 +76,7 @@ export function usePremiumSettingsPage() {
             ...currentSettings,
             premiumSources: newSources,
         });
+        pushGlobalConfig();
     };
 
     const handleAddSource = (source: VideoSource) => {

@@ -16,6 +16,7 @@ import {
     parseSourcesFromJson,
     fetchSourcesFromUrl
 } from '@/lib/utils/source-import-utils';
+import { pushGlobalConfig } from '@/lib/utils/global-config-client';
 
 export function useSettingsPage() {
     const [sources, setSources] = useState<VideoSource[]>([]);
@@ -81,6 +82,7 @@ export function useSettingsPage() {
             sortBy,
             subscriptions,
         });
+        pushGlobalConfig();
     };
 
     const handleAddSource = (source: VideoSource) => {
@@ -161,6 +163,7 @@ export function useSettingsPage() {
                 sources: updatedSources,
                 premiumSources: updatedPremiumSources,
             });
+            pushGlobalConfig();
 
             setSources(updatedSources); // Update local state
 
@@ -194,6 +197,7 @@ export function useSettingsPage() {
                 ...currentSettings,
                 subscriptions: newSubscriptions
             });
+            pushGlobalConfig();
 
             return true;
         } catch (e) {
@@ -211,6 +215,7 @@ export function useSettingsPage() {
             ...currentSettings,
             subscriptions: newSubscriptions
         });
+        pushGlobalConfig();
     };
 
     const handleRefreshSubscription = async (sub: SourceSubscription) => {
@@ -229,6 +234,7 @@ export function useSettingsPage() {
                 ...currentSettings,
                 subscriptions: updatedSubscriptions
             });
+            pushGlobalConfig();
         } catch (e) {
             console.error(e);
             // Optionally notify user of failure

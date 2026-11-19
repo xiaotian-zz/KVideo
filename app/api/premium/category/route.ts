@@ -1,17 +1,29 @@
 import { NextResponse } from 'next/server';
+import type { VideoSource } from '@/lib/types';
 
 export const runtime = 'edge';
 // We still import this type but won't rely on the empty array
 import { PREMIUM_SOURCES } from '@/lib/api/premium-sources';
 
+interface SourceVideoItem {
+    vod_id: number | string;
+    vod_name: string;
+    vod_pic?: string;
+    vod_remarks?: string;
+    type_name?: string;
+}
+
+interface SourceListResponse {
+    list?: SourceVideoItem[];
+}
+
 /**
  * Shared handler for fetching content
  */
 async function handleCategoryRequest(
-    sourceList: any[],
+    sourceList: VideoSource[],
     categoryParam: string,
-    page: number,
-    limit: number
+    page: number
 ) {
     try {
         const sourceMap = new Map<string, string>(); // sourceId -> typeId
@@ -43,7 +55,7 @@ async function handleCategoryRequest(
             return NextResponse.json({ videos: [], error: 'No enabled sources provided or found' }, { status: 500 });
         }
 
-        const fetchPromises = targetSources.map(async (source: any) => {
+        const fetchPromises = targetSources.map(async (source) => {
             try {
                 const url = new URL(source.baseUrl);
                 url.searchParams.set('ac', 'detail');
@@ -68,8 +80,8 @@ async function handleCategoryRequest(
 
                 if (!response.ok) return [];
 
-                const data = await response.json();
-                return (data.list || []).map((item: any) => ({
+                const data = (await response.json()) as SourceListResponse;
+                return (data.list || []).map((item) => ({
                     vod_id: item.vod_id,
                     vod_name: item.vod_name,
                     vod_pic: item.vod_pic,
@@ -110,16 +122,15 @@ async function handleCategoryRequest(
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { sources, category, page, limit } = body;
+        const { sources, category, page } = body;
 
         // Use provided sources
         return await handleCategoryRequest(
             sources || [],
             category || '',
-            parseInt(page || '1'),
-            parseInt(limit || '20')
+            parseInt(page || '1')
         );
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 }
@@ -130,7 +141,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const categoryParam = searchParams.get('category') || '';
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
 
-    return await handleCategoryRequest(PREMIUM_SOURCES, categoryParam, page, limit);
+    return await handleCategoryRequest(PREMIUM_SOURCES, categoryParam, page);
 }

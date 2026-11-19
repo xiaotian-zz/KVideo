@@ -16,10 +16,13 @@ export function UserDanmakuSettings() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const state = userSourcesStore.getState();
-    setApis(state.danmakuApis);
-    setActiveId(state.activeDanmakuApiId);
-    setSystemApiUrl(settingsStore.getSettings().danmakuApiUrl);
+    // 挂载后再同步外部存储，避免 effect 内同步 setState
+    queueMicrotask(() => {
+      const state = userSourcesStore.getState();
+      setApis(state.danmakuApis);
+      setActiveId(state.activeDanmakuApiId);
+      setSystemApiUrl(settingsStore.getSettings().danmakuApiUrl);
+    });
 
     const unsub = userSourcesStore.subscribe(() => {
       const s = userSourcesStore.getState();

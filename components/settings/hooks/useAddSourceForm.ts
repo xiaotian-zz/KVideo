@@ -4,7 +4,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { pinyin } from 'pinyin-pro';
 import type { VideoSource } from '@/lib/types';
 
 interface UseAddSourceFormProps {
@@ -16,7 +17,16 @@ interface UseAddSourceFormProps {
 }
 
 function generateIdFromName(name: string): string {
-    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    // 中文转拼音全拼，非中文保留字母数字，最终只留小写字母和数字
+    const fullPinyin = pinyin(name, {
+        toneType: 'none',
+        type: 'string',
+        nonZh: 'consecutive',
+    });
+    const slug = fullPinyin
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '')
+        .replace(/^-+|-+$/g, '');
     return slug || `custom-${Date.now().toString(36)}`;
 }
 
@@ -27,7 +37,10 @@ export function useAddSourceForm({ isOpen, existingIds, onAdd, onClose, initialV
     const [url, setUrl] = useState('');
     const [error, setError] = useState('');
 
-    useEffect(() => {
+    // 打开或编辑对象变化时，在渲染阶段重置表单
+    const [prevFormKey, setPrevFormKey] = useState<{ isOpen: boolean; initialValues?: VideoSource | null }>({ isOpen, initialValues });
+    if (isOpen !== prevFormKey.isOpen || initialValues !== prevFormKey.initialValues) {
+        setPrevFormKey({ isOpen, initialValues });
         if (isOpen) {
             if (initialValues) {
                 setName(initialValues.name);
@@ -42,7 +55,7 @@ export function useAddSourceForm({ isOpen, existingIds, onAdd, onClose, initialV
             }
             setError('');
         }
-    }, [isOpen, initialValues]);
+    }
 
     const handleNameChange = (newName: string) => {
         setName(newName);
