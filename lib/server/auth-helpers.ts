@@ -5,7 +5,7 @@ import {
   type Role,
 } from '@/lib/auth/permissions';
 
-export type LoginMode = 'none' | 'legacy_password' | 'managed';
+export type LoginMode = 'none' | 'managed';
 
 export interface SeedAccountInput {
   username: string;
@@ -21,6 +21,7 @@ export interface StoredAccountRecord {
   name: string;
   role: Role;
   customPermissions: Permission[];
+  banned: boolean;
   passwordHash: string;
   passwordSalt: string;
   createdAt: number;
@@ -34,7 +35,7 @@ export interface SessionPayload {
   name: string;
   role: Role;
   customPermissions?: Permission[];
-  mode: 'managed' | 'legacy';
+  mode: 'managed';
   iat: number;
 }
 
@@ -50,19 +51,11 @@ export interface SessionCookieProtocolRequest {
 export function resolveLoginMode({
   managedAccountCount,
   managedAuthEnabled,
-  managedAuthForced,
-  legacyAuthConfigured,
 }: {
   managedAccountCount: number;
   managedAuthEnabled: boolean;
-  managedAuthForced: boolean;
-  legacyAuthConfigured: boolean;
 }): LoginMode {
-  if (managedAccountCount > 0 || (managedAuthForced && managedAuthEnabled)) {
-    return 'managed';
-  }
-
-  return legacyAuthConfigured ? 'legacy_password' : 'none';
+  return managedAuthEnabled && managedAccountCount > 0 ? 'managed' : 'none';
 }
 
 export function shouldUseSecureSessionCookie(request?: SessionCookieProtocolRequest): boolean {
@@ -178,14 +171,6 @@ export async function verifyPassword(password: string, salt: string, expectedHas
   return actual.hash === expectedHash;
 }
 
-export function isBootstrapAdminCredential(
-  username: string,
-  password: string,
-  adminPassword: string
-): boolean {
-  return normalizeUsername(username) === 'admin' && !!adminPassword && password === adminPassword;
-}
-
 export async function signSessionPayload(payload: SessionPayload, secret: string): Promise<string> {
   const payloadBytes = encodeText(JSON.stringify(payload));
   const encodedPayload = encodeBase64Url(payloadBytes);
@@ -216,7 +201,12 @@ export async function verifySessionToken(token: string, secret: string): Promise
   try {
     const payload = JSON.parse(decodeText(decodeBase64Url(encodedPayload)));
     if (!payload || typeof payload !== 'object') return null;
-    if (!payload.accountId || !payload.profileId || !payload.name || !payload.role || !payload.mode || !payload.iat) {
+    if (!payload.accountId || !payload.profileId || !payload.name || !payload.role || !payload.iat) {
+      return null;
+    }
+
+    // 旧版 legacy 会话不再兼容，需要重新登录。
+    if (payload.mode !== 'managed') {
       return null;
     }
 
@@ -227,7 +217,7 @@ export async function verifySessionToken(token: string, secret: string): Promise
       name: String(payload.name),
       role: normalizeRole(payload.role),
       customPermissions: normalizePermissions(payload.customPermissions),
-      mode: payload.mode === 'managed' ? 'managed' : 'legacy',
+      mode: 'managed',
       iat: Number(payload.iat),
     };
   } catch {
@@ -331,6 +321,7 @@ export async function createStoredAccount(
     name: input.name,
     role: input.role,
     customPermissions: input.customPermissions,
+    banned: false,
     passwordHash: password.hash,
     passwordSalt: password.salt,
     createdAt: now,

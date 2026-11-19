@@ -3,7 +3,6 @@ import test from 'node:test';
 import {
   createStoredAccount,
   hashPassword,
-  isBootstrapAdminCredential,
   parseBootstrapAccounts,
   resolveLoginMode,
   verifyPassword,
@@ -41,20 +40,13 @@ test('hashPassword and verifyPassword round-trip correctly', async () => {
   assert.equal(await verifyPassword('wrong-password', password.salt, password.hash), false);
 });
 
-test('bootstrap admin credential only accepts the configured password', () => {
-  assert.equal(isBootstrapAdminCredential('ADMIN', 'current-secret', 'current-secret'), true);
-  assert.equal(isBootstrapAdminCredential('admin', 'old-secret', 'current-secret'), false);
-  assert.equal(isBootstrapAdminCredential('viewer', 'current-secret', 'current-secret'), false);
-  assert.equal(isBootstrapAdminCredential('admin', '', ''), false);
-});
-
-test('createStoredAccount hashes passwords and normalizes permissions', async () => {
+test('createStoredAccount hashes passwords', async () => {
   const account = await createStoredAccount({
     username: 'alice',
     password: 'secret',
     name: 'Alice',
-    role: 'viewer',
-    customPermissions: ['iptv_access', 'iptv_builtin_sources'],
+    role: 'user',
+    customPermissions: [],
   });
 
   assert.equal(account.username, 'alice');
@@ -62,18 +54,14 @@ test('createStoredAccount hashes passwords and normalizes permissions', async ()
   assert.equal(await verifyPassword('secret', account.passwordSalt, account.passwordHash), true);
 });
 
-test('MANAGED_AUTH_ENABLED cannot bypass hard dependencies', () => {
+test('resolveLoginMode requires managed storage and at least one account', () => {
   assert.equal(resolveLoginMode({
     managedAccountCount: 0,
     managedAuthEnabled: false,
-    managedAuthForced: true,
-    legacyAuthConfigured: true,
-  }), 'legacy_password');
+  }), 'none');
 
   assert.equal(resolveLoginMode({
-    managedAccountCount: 0,
+    managedAccountCount: 1,
     managedAuthEnabled: true,
-    managedAuthForced: true,
-    legacyAuthConfigured: true,
   }), 'managed');
 });

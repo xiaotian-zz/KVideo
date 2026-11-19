@@ -1,4 +1,12 @@
-export type Role = 'super_admin' | 'admin' | 'viewer';
+/**
+ * 角色模型：系统只保留管理员和普通用户两种角色。
+ * - admin：可使用后台与全部设置
+ * - user：仅可使用普通观看相关功能
+ *
+ * 历史数据中的 super_admin / admin 统一归并为 admin，
+ * viewer 及其他未知值统一归并为 user。
+ */
+export type Role = 'admin' | 'user';
 
 export type Permission =
   | 'source_management'
@@ -26,37 +34,23 @@ export const ALL_PERMISSIONS: Permission[] = [
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  super_admin: [
-    'source_management',
-    'account_management',
-    'danmaku_api',
-    'data_management',
-    'player_settings',
-    'danmaku_appearance',
-    'view_settings',
-    'iptv_access',
-    'iptv_source_management',
-    'iptv_builtin_sources',
-  ],
-  admin: [
-    'player_settings',
-    'danmaku_appearance',
-    'view_settings',
-    'iptv_access',
-    'iptv_source_management',
-    'iptv_builtin_sources',
-  ],
-  viewer: ['view_settings'],
+  admin: ALL_PERMISSIONS,
+  user: ['view_settings', 'iptv_access'],
 };
 
-const ROLE_HIERARCHY: Role[] = ['viewer', 'admin', 'super_admin'];
-
 export function isRole(value: string | undefined | null): value is Role {
-  return value === 'viewer' || value === 'admin' || value === 'super_admin';
+  return value === 'admin' || value === 'user';
 }
 
 export function normalizeRole(value: string | undefined | null): Role {
-  return isRole(value) ? value : 'viewer';
+  if (value === 'admin' || value === 'super_admin' || value === 'user' || value === 'viewer') {
+    return value === 'admin' || value === 'super_admin' ? 'admin' : 'user';
+  }
+  return 'user';
+}
+
+export function isAdminRole(value: string | undefined | null): boolean {
+  return normalizeRole(value) === 'admin';
 }
 
 export function isPermission(value: string | undefined | null): value is Permission {
@@ -68,27 +62,25 @@ export function normalizePermissions(values: readonly string[] | undefined | nul
   return values.filter((value): value is Permission => isPermission(value));
 }
 
-export function resolvePermissions(role: Role, customPermissions?: readonly string[] | null): Permission[] {
-  const permissions = new Set<Permission>([
-    ...(ROLE_PERMISSIONS[role] || []),
-    ...normalizePermissions(customPermissions),
-  ]);
-
-  if (permissions.has('iptv_access')) {
-    permissions.add('iptv_source_management');
-  }
-
-  return Array.from(permissions);
+/**
+ * 只按角色返回权限，忽略历史遗留的 customPermissions，
+ * 避免普通用户通过旧数据获得后台权限。
+ */
+export function resolvePermissions(role: Role): Permission[] {
+  return ROLE_PERMISSIONS[normalizeRole(role)];
 }
 
 export function hasResolvedPermission(
   role: Role,
   permission: Permission,
-  customPermissions?: readonly string[] | null
+  _customPermissions?: readonly string[] | null
 ): boolean {
-  return resolvePermissions(role, customPermissions).includes(permission);
+  return resolvePermissions(role).includes(permission);
 }
 
 export function hasRoleAtLeast(role: Role, minimumRole: Role): boolean {
-  return ROLE_HIERARCHY.indexOf(role) >= ROLE_HIERARCHY.indexOf(minimumRole);
+  if (minimumRole === 'admin') {
+    return normalizeRole(role) === 'admin';
+  }
+  return true;
 }

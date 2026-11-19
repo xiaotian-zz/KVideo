@@ -28,7 +28,7 @@ export function PremiumPasswordGate({ children }: { children: React.ReactNode })
                 const data = await configRes.json();
                 const sessionData = sessionRes.ok ? await sessionRes.json() : null;
                 const isAdminSession = !!sessionData?.session &&
-                    (sessionData.session.role === 'admin' || sessionData.session.role === 'super_admin');
+                    sessionData.session.role === 'admin';
 
                 if (mounted) {
                     // If no premium password configured, allow access

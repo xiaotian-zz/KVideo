@@ -9,7 +9,7 @@ const session: AuthSession = {
   profileId: 'profile-1',
   username: 'alice',
   name: 'Alice',
-  role: 'viewer',
+  role: 'user',
   customPermissions: [],
   mode: 'managed',
 };

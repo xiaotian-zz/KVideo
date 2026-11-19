@@ -43,7 +43,7 @@ test('signed sessions round-trip and reject tampering', async () => {
     profileId: 'profile-1',
     username: 'alice',
     name: 'Alice',
-    role: 'super_admin',
+    role: 'admin',
     customPermissions: ['iptv_access'],
     mode: 'managed',
     iat: Date.now(),
@@ -58,13 +58,14 @@ test('signed sessions round-trip and reject tampering', async () => {
   assert.equal(await verifySessionToken(tampered, 'test-secret'), null);
 });
 
-test('role permissions preserve IPTV management inheritance', () => {
-  const permissions = resolvePermissions('viewer', ['iptv_access']);
+test('role permissions are limited to admin and user', () => {
+  const permissions = resolvePermissions('user');
   assert.ok(permissions.includes('iptv_access'));
-  assert.ok(permissions.includes('iptv_source_management'));
+  assert.equal(permissions.includes('iptv_source_management'), false);
   assert.equal(hasResolvedPermission('admin', 'player_settings'), true);
-  assert.equal(hasResolvedPermission('viewer', 'account_management'), false);
-  assert.equal(hasRoleAtLeast('super_admin', 'admin'), true);
+  assert.equal(hasResolvedPermission('user', 'account_management'), false);
+  assert.equal(hasRoleAtLeast('admin', 'admin'), true);
+  assert.equal(hasRoleAtLeast('user', 'admin'), false);
 });
 
 test('session cookies are secure only for HTTPS production requests', () => {

@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Lock, User } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Lock, User, UserPlus } from 'lucide-react';
 import { clearSession, getSession, setSession, type AuthSession } from '@/lib/store/auth-store';
 import { resolvePasswordGateState } from '@/lib/auth/password-gate-state';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
 import { hasStoredAppSetting, settingsStore } from '@/lib/store/settings-store';
 import { useIPTVStore } from '@/lib/store/iptv-store';
-
-type LoginMode = 'none' | 'legacy_password' | 'managed';
 
 function syncIPTVSources(rawValue: string) {
   const iptvStore = useIPTVStore.getState();
@@ -114,6 +114,9 @@ export function PasswordGate({
 }) {
   useSubscriptionSync();
 
+  const pathname = usePathname();
+  const isRegisterRoute = pathname === '/register' || pathname.startsWith('/register/');
+
   const [isLocked, setIsLocked] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -121,7 +124,7 @@ export function PasswordGate({
   const [isClient, setIsClient] = useState(false);
   const [persistSession, setPersistSession] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
-  const [loginMode, setLoginMode] = useState<LoginMode>('none');
+  const [allowRegister, setAllowRegister] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -145,7 +148,7 @@ export function PasswordGate({
         if (!mounted) return;
 
         setPersistSession(config.persistSession);
-        setLoginMode(config.loginMode || 'none');
+        setAllowRegister(!!config.allowRegister);
         applyRuntimeConfig(config);
 
         const serverSession = sessionStatus.authenticated && sessionStatus.session
@@ -201,30 +204,29 @@ export function PasswordGate({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: loginMode === 'managed' ? username : undefined,
+          username,
           password,
         }),
       });
       const data = await response.json();
 
       if (response.status === 503) {
-        setError('认证存储暂时不可用，请检查 Upstash Redis 配置');
+        setError('认证存储暂时不可用，请检查 Redis/Kvrocks 配置');
         setIsValidating(false);
         return;
       }
 
       if (data.valid && data.session) {
         setSession(toAuthSession(data.session), data.persistSession ?? persistSession);
-        setIsLocked(false);
-        setIsClient(true);
-        setIsValidating(false);
+        // 重新加载以切换到该用户独立的本地存储命名空间
+        window.location.reload();
         return;
       }
     } catch {
       // Ignore network errors and show the same message as invalid credentials.
     }
 
-    setError(loginMode === 'managed' ? '用户名或密码错误' : '密码错误');
+    setError('用户名或密码错误');
     setIsValidating(false);
     const form = document.getElementById('password-form');
     form?.classList.add('animate-shake');
@@ -233,11 +235,14 @@ export function PasswordGate({
 
   if (!isClient) return null;
 
-  if (!isLocked) {
+  // 注册页需在未登录状态下访问，不显示访问密码 gate
+  if (isRegisterRoute) {
     return <>{children}</>;
   }
 
-  const showManagedFields = loginMode === 'managed';
+  if (!isLocked) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--bg-color)] bg-[image:var(--bg-image)] text-[var(--text-color)]">
@@ -254,30 +259,28 @@ export function PasswordGate({
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-bold">访问受限</h2>
             <p className="text-[var(--text-color-secondary)]">
-              {showManagedFields ? '请输入用户名和密码以继续' : '请输入访问密码以继续'}
+              请输入用户名和密码以继续
             </p>
           </div>
 
           <div className="w-full space-y-4">
-            {showManagedFields && (
-              <div className="space-y-2">
-                <div className="relative">
-                  <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-color-secondary)]" />
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(event) => {
-                      setUsername(event.target.value);
-                      setError('');
-                    }}
-                    placeholder="输入用户名..."
-                    className="w-full pl-11 pr-4 py-3 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] border border-[var(--glass-border)] focus:outline-none focus:border-[var(--accent-color)] focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-color)_30%,transparent)] transition-all duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) text-[var(--text-color)] placeholder-[var(--text-color-secondary)]"
-                    autoComplete="username"
-                    autoFocus
-                  />
-                </div>
+            <div className="space-y-2">
+              <div className="relative">
+                <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-color-secondary)]" />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(event) => {
+                    setUsername(event.target.value);
+                    setError('');
+                  }}
+                  placeholder="输入用户名..."
+                  className="w-full pl-11 pr-4 py-3 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] border border-[var(--glass-border)] focus:outline-none focus:border-[var(--accent-color)] focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-color)_30%,transparent)] transition-all duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) text-[var(--text-color)] placeholder-[var(--text-color-secondary)]"
+                  autoComplete="username"
+                  autoFocus
+                />
               </div>
-            )}
+            </div>
 
             <div className="space-y-2">
               <input
@@ -287,10 +290,9 @@ export function PasswordGate({
                   setPassword(event.target.value);
                   setError('');
                 }}
-                placeholder={showManagedFields ? '输入密码...' : '输入密码...'}
+                placeholder="输入密码..."
                 className={`w-full px-4 py-3 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] border ${error ? 'border-red-500' : 'border-[var(--glass-border)]'} focus:outline-none focus:border-[var(--accent-color)] focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent-color)_30%,transparent)] transition-all duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) text-[var(--text-color)] placeholder-[var(--text-color-secondary)]`}
-                autoFocus={!showManagedFields}
-                autoComplete={showManagedFields ? 'current-password' : 'off'}
+                autoComplete="current-password"
               />
               {error && (
                 <p className="text-sm text-red-500 text-center animate-pulse">
@@ -306,6 +308,16 @@ export function PasswordGate({
             >
               {isValidating ? '验证中...' : '登录'}
             </button>
+
+            {allowRegister && (
+              <Link
+                href="/register"
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 text-sm font-semibold text-[var(--accent-color)] bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] hover:border-[var(--accent-color)]/40 transition-all duration-200"
+              >
+                <UserPlus size={16} />
+                还没有账户？立即注册
+              </Link>
+            )}
           </div>
         </form>
       </div>

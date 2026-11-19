@@ -6,7 +6,6 @@ import {
   createStoredAccount,
   ensureUniqueUsername,
   hashPassword,
-  isBootstrapAdminCredential,
   normalizeUsername,
   parseBootstrapAccounts,
   resolveLoginMode,
@@ -37,7 +36,7 @@ export interface ServerAuthSession {
   name: string;
   role: Role;
   customPermissions: Permission[];
-  mode: 'managed' | 'legacy';
+  mode: 'managed';
   iat: number;
 }
 
@@ -46,6 +45,8 @@ export interface PublicAuthConfig {
   hasPremiumAuth: boolean;
   loginMode: LoginMode;
   persistSession: boolean;
+  allowRegister: boolean;
+  requireInviteCode: boolean;
   subscriptionSources: string;
   iptvSources: string;
   mergeSources: string;
@@ -59,7 +60,7 @@ export interface PublicSessionData {
   name: string;
   role: Role;
   customPermissions?: Permission[];
-  mode: 'managed' | 'legacy';
+  mode: 'managed';
 }
 
 export interface AccountInfo {
@@ -68,14 +69,14 @@ export interface AccountInfo {
   name: string;
   role: Role;
   customPermissions: Permission[];
+  banned: boolean;
   createdAt: number;
   updatedAt: number;
 }
 
-const SESSION_COOKIE_NAME = 'kvideo_session';
+export const SESSION_COOKIE_NAME = 'kvideo_session';
 const MANAGED_ACCOUNTS_KEY = 'auth:accounts:v1';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
-const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || '';
 const ACCOUNTS = process.env.ACCOUNTS || '';
 const AUTH_SECRET = process.env.AUTH_SECRET || '';
 const PREMIUM_PASSWORD = process.env.PREMIUM_PASSWORD || '';
@@ -85,12 +86,6 @@ const IPTV_SOURCES = process.env.IPTV_SOURCES || process.env.NEXT_PUBLIC_IPTV_SO
 const MERGE_SOURCES = process.env.MERGE_SOURCES || process.env.NEXT_PUBLIC_MERGE_SOURCES || '';
 const DANMAKU_API_URL = process.env.DANMAKU_API_URL || process.env.NEXT_PUBLIC_DANMAKU_API_URL || '';
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-const MANAGED_AUTH_FORCED = process.env.MANAGED_AUTH_ENABLED === 'true';
-
-function getEffectiveAdminPassword(): string {
-  return getRuntimeEnvValue('ADMIN_PASSWORD', ADMIN_PASSWORD) ||
-    getRuntimeEnvValue('ACCESS_PASSWORD', ACCESS_PASSWORD);
-}
 
 export class ManagedAuthStorageError extends Error {
   constructor(operation: 'read' | 'write', cause?: unknown) {
@@ -99,12 +94,16 @@ export class ManagedAuthStorageError extends Error {
   }
 }
 
-function isManagedAuthEnabled(): boolean {
-  return !!getRuntimeEnvValue('AUTH_SECRET', AUTH_SECRET) && !!getRedisClient();
+function getAdminUsername(): string {
+  return normalizeUsername(getRuntimeEnvValue('ADMIN_USERNAME', 'admin')) || 'admin';
 }
 
-function isLegacyAuthConfigured(): boolean {
-  return !!(getEffectiveAdminPassword() || ACCOUNTS);
+function getAdminPassword(): string {
+  return getRuntimeEnvValue('ADMIN_PASSWORD', ADMIN_PASSWORD);
+}
+
+function isManagedAuthEnabled(): boolean {
+  return !!getRuntimeEnvValue('AUTH_SECRET', AUTH_SECRET) && !!getRedisClient();
 }
 
 function isStoredAccountRecord(value: unknown): value is StoredAccountRecord {
@@ -124,7 +123,8 @@ function normalizeStoredAccount(value: StoredAccountRecord): StoredAccountRecord
     ...value,
     username: normalizeUsername(value.username),
     role: normalizeRole(value.role),
-    customPermissions: normalizePermissions(value.customPermissions),
+    customPermissions: [],
+    banned: value.banned === true,
   };
 }
 
@@ -159,18 +159,24 @@ async function saveManagedAccounts(accounts: StoredAccountRecord[]): Promise<voi
   }
 }
 
+/**
+ * 仅在账户库为空时写入初始账户：
+ * - ADMIN_PASSWORD 创建唯一管理员
+ * - ACCOUNTS 中的账户一律作为普通用户导入
+ */
 function getBootstrapSeeds(): SeedAccountInput[] {
   const seeds: SeedAccountInput[] = [];
   const usernames = new Set<string>();
-  const effectiveAdminPassword = getEffectiveAdminPassword();
 
-  if (effectiveAdminPassword) {
-    usernames.add('admin');
+  const adminPassword = getAdminPassword();
+  if (adminPassword) {
+    const username = getAdminUsername();
+    usernames.add(username);
     seeds.push({
-      username: 'admin',
-      password: effectiveAdminPassword,
-      name: '超级管理员',
-      role: 'super_admin',
+      username,
+      password: adminPassword,
+      name: '管理员',
+      role: 'admin',
       customPermissions: [],
     });
   }
@@ -178,7 +184,7 @@ function getBootstrapSeeds(): SeedAccountInput[] {
   for (const account of parseBootstrapAccounts(ACCOUNTS)) {
     const username = ensureUniqueUsername(account.username, usernames, account.name);
     usernames.add(username);
-    seeds.push({ ...account, username });
+    seeds.push({ ...account, username, role: 'user', customPermissions: [] });
   }
 
   return seeds;
@@ -207,14 +213,19 @@ async function ensureManagedAccountsBootstrapped(): Promise<StoredAccountRecord[
 
 async function getManagedAccountCount(): Promise<number> {
   if (!isManagedAuthEnabled()) return 0;
+
   const existing = await readManagedAccounts();
   if (existing.length > 0) {
     return existing.length;
   }
+
   return getBootstrapSeeds().length;
 }
 
-function getPublicRuntimeConfig(): Omit<PublicAuthConfig, 'hasAuth' | 'hasPremiumAuth' | 'loginMode'> {
+function getPublicRuntimeConfig(): Omit<
+  PublicAuthConfig,
+  'hasAuth' | 'hasPremiumAuth' | 'loginMode' | 'allowRegister' | 'requireInviteCode'
+> {
   const runtimeFeatures = getRuntimeFeatures();
 
   return {
@@ -232,42 +243,23 @@ export async function getPublicAuthConfig(): Promise<PublicAuthConfig> {
   const loginMode = resolveLoginMode({
     managedAccountCount,
     managedAuthEnabled,
-    managedAuthForced: getRuntimeEnvValue('MANAGED_AUTH_ENABLED') === 'true' || MANAGED_AUTH_FORCED,
-    legacyAuthConfigured: isLegacyAuthConfigured(),
   });
 
   return {
     hasAuth: loginMode !== 'none',
     hasPremiumAuth: !!PREMIUM_PASSWORD,
     loginMode,
+    allowRegister:
+      managedAuthEnabled &&
+      loginMode === 'managed' &&
+      getRuntimeEnvValue('ALLOW_REGISTRATION', 'true') !== 'false',
+    requireInviteCode: !!getRuntimeEnvValue('REGISTRATION_INVITE_CODE').trim(),
     ...getPublicRuntimeConfig(),
   };
 }
 
-function buildLegacyProfileIdInput(password: string): ArrayBuffer {
-  const bytes = new TextEncoder().encode(`${password}kvideo-profile-salt-v1`);
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
-async function generateLegacyProfileId(password: string): Promise<string> {
-  const hash = await crypto.subtle.digest('SHA-256', buildLegacyProfileIdInput(password));
-  return Array.from(new Uint8Array(hash))
-    .slice(0, 8)
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function resolveSessionSecret(loginMode: LoginMode): string | null {
-  const authSecret = getRuntimeEnvValue('AUTH_SECRET', AUTH_SECRET);
-  if (authSecret) {
-    return authSecret;
-  }
-
-  if (loginMode === 'legacy_password' && isLegacyAuthConfigured()) {
-    return `legacy:${getEffectiveAdminPassword()}:${ACCOUNTS}:${PREMIUM_PASSWORD}`;
-  }
-
-  return null;
+function resolveSessionSecret(): string | null {
+  return getRuntimeEnvValue('AUTH_SECRET', AUTH_SECRET) || null;
 }
 
 function sessionPayloadToServerSession(payload: SessionPayload): ServerAuthSession {
@@ -277,8 +269,8 @@ function sessionPayloadToServerSession(payload: SessionPayload): ServerAuthSessi
     username: payload.username,
     name: payload.name,
     role: payload.role,
-    customPermissions: normalizePermissions(payload.customPermissions),
-    mode: payload.mode,
+    customPermissions: [],
+    mode: 'managed',
     iat: payload.iat,
   };
 }
@@ -291,12 +283,12 @@ export function toPublicSession(session: ServerAuthSession): PublicSessionData {
     name: session.name,
     role: session.role,
     customPermissions: session.customPermissions.length > 0 ? session.customPermissions : undefined,
-    mode: session.mode,
+    mode: 'managed',
   };
 }
 
-async function signSession(session: ServerAuthSession, loginMode: LoginMode): Promise<string | null> {
-  const secret = resolveSessionSecret(loginMode);
+async function signSession(session: ServerAuthSession): Promise<string | null> {
+  const secret = resolveSessionSecret();
   if (!secret) return null;
 
   return signSessionPayload(
@@ -306,20 +298,20 @@ async function signSession(session: ServerAuthSession, loginMode: LoginMode): Pr
       username: session.username,
       name: session.name,
       role: session.role,
-      customPermissions: session.customPermissions,
-      mode: session.mode,
+      customPermissions: [],
+      mode: 'managed',
       iat: session.iat,
     },
     secret
   );
 }
 
-export async function getServerSession(request: NextRequest): Promise<ServerAuthSession | null> {
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+export async function getServerSessionFromCookieValue(
+  token: string | undefined
+): Promise<ServerAuthSession | null> {
   if (!token) return null;
 
-  const config = await getPublicAuthConfig();
-  const secret = resolveSessionSecret(config.loginMode);
+  const secret = resolveSessionSecret();
   if (!secret) return null;
 
   const payload = await verifySessionToken(token, secret);
@@ -328,55 +320,19 @@ export async function getServerSession(request: NextRequest): Promise<ServerAuth
   return sessionPayloadToServerSession(payload);
 }
 
-export function hasServerPermission(session: ServerAuthSession, permission: Permission): boolean {
-  return hasResolvedPermission(session.role, permission, session.customPermissions);
+export async function getServerSession(request: NextRequest): Promise<ServerAuthSession | null> {
+  return getServerSessionFromCookieValue(request.cookies.get(SESSION_COOKIE_NAME)?.value);
 }
 
-export function isSuperAdminSession(session: ServerAuthSession): boolean {
-  return session.role === 'super_admin';
-}
+// 管理接口使用：除签名校验外，再以存储中的账户状态为准（防止封禁/降权后旧 token 继续生效）
+export async function getAuthoritativeSessionFromSession(
+  session: ServerAuthSession | null
+): Promise<ServerAuthSession | null> {
+  if (!session) return null;
 
-async function authenticateManagedLogin(username: string, password: string): Promise<ServerAuthSession | null> {
-  const normalizedUsername = normalizeUsername(username);
-  if (!normalizedUsername || !password) return null;
-
-  const usesBootstrapAdminCredential = isBootstrapAdminCredential(
-    normalizedUsername,
-    password,
-    getEffectiveAdminPassword()
-  );
-
-  const accounts = await ensureManagedAccountsBootstrapped();
-  let account = accounts.find((item) => item.username === normalizedUsername);
-
-  if (!account) {
-    if (!usesBootstrapAdminCredential) return null;
-
-    account = await createStoredAccount({
-      username: 'admin',
-      password,
-      name: '超级管理员',
-      role: 'super_admin',
-      customPermissions: [],
-    });
-    await saveManagedAccounts([...accounts, account]);
-  } else {
-    const valid = await verifyPassword(password, account.passwordSalt, account.passwordHash);
-    if (!valid) {
-      if (!usesBootstrapAdminCredential) return null;
-
-      const nextPassword = await hashPassword(password);
-      account = {
-        ...account,
-        passwordHash: nextPassword.hash,
-        passwordSalt: nextPassword.salt,
-        updatedAt: Date.now(),
-      };
-      await saveManagedAccounts(
-        accounts.map((item) => item.id === account?.id ? account : item)
-      );
-    }
-  }
+  const accounts = await readManagedAccounts();
+  const account = accounts.find((item) => item.id === session.accountId);
+  if (!account || account.banned) return null;
 
   return {
     accountId: account.id,
@@ -384,67 +340,57 @@ async function authenticateManagedLogin(username: string, password: string): Pro
     username: account.username,
     name: account.name,
     role: account.role,
-    customPermissions: account.customPermissions,
+    customPermissions: [],
+    mode: 'managed',
+    iat: session.iat,
+  };
+}
+
+export async function getAuthoritativeSession(
+  request: NextRequest
+): Promise<ServerAuthSession | null> {
+  return getAuthoritativeSessionFromSession(await getServerSession(request));
+}
+
+export function hasServerPermission(session: ServerAuthSession, permission: Permission): boolean {
+  return hasResolvedPermission(session.role, permission);
+}
+
+export function isAdminSession(session: ServerAuthSession): boolean {
+  return session.role === 'admin';
+}
+
+async function authenticateManagedLogin(username: string, password: string): Promise<ServerAuthSession | null> {
+  const normalizedUsername = normalizeUsername(username);
+  if (!normalizedUsername || !password) return null;
+
+  const accounts = await ensureManagedAccountsBootstrapped();
+  const account = accounts.find((item) => item.username === normalizedUsername);
+
+  if (!account || account.banned) return null;
+
+  const valid = await verifyPassword(password, account.passwordSalt, account.passwordHash);
+  if (!valid) return null;
+
+  return {
+    accountId: account.id,
+    profileId: account.id,
+    username: account.username,
+    name: account.name,
+    role: account.role,
+    customPermissions: [],
     mode: 'managed',
     iat: Date.now(),
   };
 }
 
-async function authenticateLegacyLogin(password: string): Promise<ServerAuthSession | null> {
-  if (!password) return null;
-  const effectiveAdminPassword = getEffectiveAdminPassword();
-
-  if (effectiveAdminPassword && password === effectiveAdminPassword) {
-    return {
-      accountId: 'legacy-admin',
-      profileId: await generateLegacyProfileId(password),
-      username: 'admin',
-      name: '超级管理员',
-      role: 'super_admin',
-      customPermissions: [],
-      mode: 'legacy',
-      iat: Date.now(),
-    };
-  }
-
-  for (const account of parseBootstrapAccounts(ACCOUNTS)) {
-    if (account.password !== password) continue;
-    return {
-      accountId: `legacy:${account.username}`,
-      profileId: await generateLegacyProfileId(password),
-      username: account.username,
-      name: account.name,
-      role: account.role,
-      customPermissions: account.customPermissions,
-      mode: 'legacy',
-      iat: Date.now(),
-    };
-  }
-
-  return null;
-}
-
 export async function authenticateLogin(body: { username?: string; password?: string }): Promise<ServerAuthSession | null> {
   const config = await getPublicAuthConfig();
-  if (config.loginMode === 'managed') {
-    return authenticateManagedLogin(body.username || '', body.password || '');
+  if (config.loginMode !== 'managed') {
+    return null;
   }
 
-  if (config.loginMode === 'legacy_password') {
-    return authenticateLegacyLogin(body.password || '');
-  }
-
-  return null;
-}
-
-async function authenticateManagedAdminCredential(username: string, password: string): Promise<boolean> {
-  const session = await authenticateManagedLogin(username, password);
-  return !!session && (session.role === 'super_admin' || session.role === 'admin');
-}
-
-async function authenticateLegacyAdminCredential(password: string): Promise<boolean> {
-  const session = await authenticateLegacyLogin(password);
-  return !!session && (session.role === 'super_admin' || session.role === 'admin');
+  return authenticateManagedLogin(body.username || '', body.password || '');
 }
 
 export async function validatePremiumAccess(
@@ -452,7 +398,7 @@ export async function validatePremiumAccess(
   body: { username?: string; password?: string }
 ): Promise<boolean> {
   const session = await getServerSession(request);
-  if (session && (session.role === 'super_admin' || session.role === 'admin')) {
+  if (session && isAdminSession(session)) {
     return true;
   }
 
@@ -469,12 +415,12 @@ export async function validatePremiumAccess(
   }
 
   const config = await getPublicAuthConfig();
-  if (config.loginMode === 'managed') {
-    if (!body.username) return false;
-    return authenticateManagedAdminCredential(body.username, body.password);
+  if (config.loginMode === 'managed' && body.username) {
+    const premiumSession = await authenticateManagedLogin(body.username, body.password);
+    return !!premiumSession && isAdminSession(premiumSession);
   }
 
-  return authenticateLegacyAdminCredential(body.password);
+  return false;
 }
 
 export async function createLoginResponse(
@@ -482,7 +428,7 @@ export async function createLoginResponse(
   request?: SessionCookieProtocolRequest,
 ): Promise<NextResponse> {
   const config = await getPublicAuthConfig();
-  const token = await signSession(session, config.loginMode);
+  const token = await signSession(session);
   if (!token) {
     return NextResponse.json({ valid: false, message: 'Session signing unavailable' }, { status: 500 });
   }
@@ -527,51 +473,17 @@ export function logoutResponse(request?: SessionCookieProtocolRequest): NextResp
 }
 
 export async function listAccountInfo(): Promise<AccountInfo[]> {
-  const config = await getPublicAuthConfig();
-
-  if (config.loginMode === 'managed') {
-    const accounts = await ensureManagedAccountsBootstrapped();
-    return accounts.map((account) => ({
-      id: account.id,
-      username: account.username,
-      name: account.name,
-      role: account.role,
-      customPermissions: account.customPermissions,
-      createdAt: account.createdAt,
-      updatedAt: account.updatedAt,
-    }));
-  }
-
-  const legacyAccounts: AccountInfo[] = [];
-  let index = 0;
-
-  if (getEffectiveAdminPassword()) {
-    legacyAccounts.push({
-      id: 'legacy-admin',
-      username: 'admin',
-      name: '超级管理员',
-      role: 'super_admin',
-      customPermissions: [],
-      createdAt: 0,
-      updatedAt: 0,
-    });
-    index += 1;
-  }
-
-  for (const account of parseBootstrapAccounts(ACCOUNTS)) {
-    legacyAccounts.push({
-      id: `legacy-${index}`,
-      username: account.username,
-      name: account.name,
-      role: account.role,
-      customPermissions: account.customPermissions,
-      createdAt: 0,
-      updatedAt: 0,
-    });
-    index += 1;
-  }
-
-  return legacyAccounts;
+  const accounts = await ensureManagedAccountsBootstrapped();
+  return accounts.map((account) => ({
+    id: account.id,
+    username: account.username,
+    name: account.name,
+    role: account.role,
+    customPermissions: [],
+    banned: account.banned,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
+  }));
 }
 
 function sanitizeAccountInput(body: unknown): {
@@ -579,7 +491,7 @@ function sanitizeAccountInput(body: unknown): {
   name?: string;
   password?: string;
   role?: Role;
-  customPermissions?: Permission[];
+  banned?: boolean;
 } {
   if (!body || typeof body !== 'object') return {};
   const input = body as Record<string, unknown>;
@@ -589,19 +501,21 @@ function sanitizeAccountInput(body: unknown): {
     name: typeof input.name === 'string' ? input.name.trim() : undefined,
     password: typeof input.password === 'string' ? input.password : undefined,
     role: typeof input.role === 'string' ? normalizeRole(input.role) : undefined,
-    customPermissions: Array.isArray(input.customPermissions) ? normalizePermissions(input.customPermissions as string[]) : undefined,
+    banned: typeof input.banned === 'boolean' ? input.banned : undefined,
   };
 }
 
-function ensureOneSuperAdmin(accounts: StoredAccountRecord[]): void {
-  const count = accounts.filter((account) => account.role === 'super_admin').length;
+function ensureOneAdmin(accounts: StoredAccountRecord[]): void {
+  const count = accounts.filter(
+    (account) => account.role === 'admin' && !account.banned
+  ).length;
   if (count === 0) {
-    throw new Error('At least one super admin account is required');
+    throw new Error('至少需要保留一个可用的管理员账户');
   }
 }
 
 export async function createManagedAccount(body: unknown): Promise<AccountInfo> {
-  if (!getRedisClient() || !isManagedAuthEnabled()) {
+  if (!isManagedAuthEnabled()) {
     throw new Error('Managed accounts unavailable');
   }
 
@@ -620,11 +534,11 @@ export async function createManagedAccount(body: unknown): Promise<AccountInfo> 
     password: input.password,
     name: input.name,
     role: input.role,
-    customPermissions: input.customPermissions || [],
+    customPermissions: [],
   });
 
   const nextAccounts = [...accounts, created];
-  ensureOneSuperAdmin(nextAccounts);
+  ensureOneAdmin(nextAccounts);
   await saveManagedAccounts(nextAccounts);
 
   return {
@@ -632,13 +546,18 @@ export async function createManagedAccount(body: unknown): Promise<AccountInfo> 
     username: created.username,
     name: created.name,
     role: created.role,
-    customPermissions: created.customPermissions,
+    customPermissions: [],
+    banned: created.banned,
     createdAt: created.createdAt,
     updatedAt: created.updatedAt,
   };
 }
 
-export async function updateManagedAccount(accountId: string, body: unknown): Promise<AccountInfo> {
+export async function updateManagedAccount(
+  accountId: string,
+  body: unknown,
+  requesterAccountId?: string
+): Promise<AccountInfo> {
   if (!isManagedAuthEnabled()) {
     throw new Error('Managed accounts unavailable');
   }
@@ -655,9 +574,14 @@ export async function updateManagedAccount(accountId: string, body: unknown): Pr
     ...current,
     name: input.name || current.name,
     role: input.role || current.role,
-    customPermissions: input.customPermissions ?? current.customPermissions,
+    customPermissions: [],
+    banned: input.banned ?? current.banned,
     updatedAt: Date.now(),
   };
+
+  if (requesterAccountId === accountId && updated.banned) {
+    throw new Error('Cannot ban the current account');
+  }
 
   if (input.password) {
     const password = await hashPassword(input.password);
@@ -666,7 +590,7 @@ export async function updateManagedAccount(accountId: string, body: unknown): Pr
   }
 
   const nextAccounts = accounts.map((account) => account.id === accountId ? updated : account);
-  ensureOneSuperAdmin(nextAccounts);
+  ensureOneAdmin(nextAccounts);
   await saveManagedAccounts(nextAccounts);
 
   return {
@@ -674,15 +598,23 @@ export async function updateManagedAccount(accountId: string, body: unknown): Pr
     username: updated.username,
     name: updated.name,
     role: updated.role,
-    customPermissions: updated.customPermissions,
+    customPermissions: [],
+    banned: updated.banned,
     createdAt: updated.createdAt,
     updatedAt: updated.updatedAt,
   };
 }
 
-export async function deleteManagedAccount(accountId: string): Promise<void> {
+export async function deleteManagedAccount(
+  accountId: string,
+  requesterAccountId?: string
+): Promise<void> {
   if (!isManagedAuthEnabled()) {
     throw new Error('Managed accounts unavailable');
+  }
+
+  if (requesterAccountId === accountId) {
+    throw new Error('Cannot delete the current account');
   }
 
   const accounts = await ensureManagedAccountsBootstrapped();
@@ -691,6 +623,82 @@ export async function deleteManagedAccount(accountId: string): Promise<void> {
     throw new Error('Account not found');
   }
 
-  ensureOneSuperAdmin(nextAccounts);
+  ensureOneAdmin(nextAccounts);
   await saveManagedAccounts(nextAccounts);
+}
+
+export interface RegisterAccountInput {
+  username?: unknown;
+  password?: unknown;
+  confirmPassword?: unknown;
+  inviteCode?: unknown;
+}
+
+// 开放注册：用户名 3-20 位字母数字下划线、密码至少 6 位、可选邀请码；新用户固定为普通用户
+export async function registerManagedAccount(
+  body: RegisterAccountInput
+): Promise<ServerAuthSession> {
+  const config = await getPublicAuthConfig();
+
+  if (!isManagedAuthEnabled() || config.loginMode !== 'managed') {
+    throw new Error('当前部署未启用托管账户注册');
+  }
+
+  if (!config.allowRegister) {
+    throw new Error('管理员已关闭用户注册功能');
+  }
+
+  const rawUsername = typeof body.username === 'string' ? body.username.trim() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+  const confirmPassword = typeof body.confirmPassword === 'string' ? body.confirmPassword : '';
+
+  if (!rawUsername) throw new Error('用户名不能为空');
+  if (!/^[a-zA-Z0-9_]{3,20}$/.test(rawUsername)) {
+    throw new Error('用户名只能包含字母、数字和下划线，长度 3-20 位');
+  }
+  if (!password) throw new Error('密码不能为空');
+  if (password !== confirmPassword) throw new Error('两次输入的密码不一致');
+  if (password.length < 6) throw new Error('密码长度至少 6 位');
+
+  if (config.requireInviteCode) {
+    const expected = getRuntimeEnvValue('REGISTRATION_INVITE_CODE').trim().toUpperCase();
+    const supplied = typeof body.inviteCode === 'string'
+      ? body.inviteCode.trim().toUpperCase()
+      : '';
+
+    if (!supplied) throw new Error('请输入邀请码');
+    if (supplied !== expected) throw new Error('邀请码无效');
+  }
+
+  const username = normalizeUsername(rawUsername);
+  const accounts = await ensureManagedAccountsBootstrapped();
+
+  if (!accounts.some((account) => account.role === 'admin' && !account.banned)) {
+    throw new Error('系统尚未初始化管理员账户，暂不开放注册');
+  }
+
+  if (accounts.some((account) => account.username === username)) {
+    throw new Error('该用户名已被注册');
+  }
+
+  const created = await createStoredAccount({
+    username,
+    password,
+    name: rawUsername,
+    role: 'user',
+    customPermissions: [],
+  });
+
+  await saveManagedAccounts([...accounts, created]);
+
+  return {
+    accountId: created.id,
+    profileId: created.id,
+    username: created.username,
+    name: created.name,
+    role: created.role,
+    customPermissions: [],
+    mode: 'managed',
+    iat: Date.now(),
+  };
 }

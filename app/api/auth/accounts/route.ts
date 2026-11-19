@@ -1,29 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createManagedAccount,
+  getAuthoritativeSession,
   getPublicAuthConfig,
-  getServerSession,
-  isSuperAdminSession,
+  isAdminSession,
   listAccountInfo,
+  ManagedAuthStorageError,
 } from '@/lib/server/auth';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
-async function requireSuperAdmin(request: NextRequest) {
-  const session = await getServerSession(request);
-  if (!session) {
-    return { error: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
+async function requireAdmin(request: NextRequest) {
+  try {
+    const session = await getAuthoritativeSession(request);
+    if (!session) {
+      return { error: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
+    }
+
+    if (!isAdminSession(session)) {
+      return { error: NextResponse.json({ error: 'Admin required' }, { status: 403 }) };
+    }
+
+    return { session };
+  } catch (error) {
+    if (error instanceof ManagedAuthStorageError) {
+      return {
+        error: NextResponse.json(
+          { error: 'Managed authentication storage is unavailable' },
+          { status: 503 }
+        ),
+      };
+    }
+    throw error;
   }
-
-  if (!isSuperAdminSession(session)) {
-    return { error: NextResponse.json({ error: 'Super admin required' }, { status: 403 }) };
-  }
-
-  return { session };
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requireAdmin(request);
   if ('error' in auth) {
     return auth.error;
   }
@@ -40,7 +53,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requireAdmin(request);
   if ('error' in auth) {
     return auth.error;
   }

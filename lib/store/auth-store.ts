@@ -21,7 +21,7 @@ export interface AuthSession {
   name: string;
   role: Role;
   customPermissions?: Permission[];
-  mode?: 'managed' | 'legacy';
+  mode?: 'managed';
 }
 
 const SESSION_KEY = 'kvideo-session';
@@ -57,7 +57,7 @@ export function getSession(): AuthSession | null {
       name: parsed.name,
       role: normalizeRole(parsed.role),
       customPermissions: normalizePermissions(parsed.customPermissions),
-      mode: parsed.mode === 'managed' ? 'managed' : parsed.mode === 'legacy' ? 'legacy' : undefined,
+      mode: parsed.mode === 'managed' ? 'managed' : undefined,
     };
   } catch {
     return null;
@@ -98,19 +98,19 @@ export function clearSession(): void {
 
 export function isAdmin(): boolean {
   const session = getSession();
-  if (!session) return true;
-  return session.role === 'admin' || session.role === 'super_admin';
+  if (!session) return false;
+  return session.role === 'admin';
 }
 
 export function hasPermission(permission: Permission): boolean {
   const session = getSession();
-  if (!session) return true;
-  return hasResolvedPermission(session.role, permission, session.customPermissions);
+  if (!session) return false;
+  return hasResolvedPermission(session.role, permission);
 }
 
 export function hasRole(minimumRole: Role): boolean {
   const session = getSession();
-  if (!session) return true;
+  if (!session) return false;
   return hasRoleAtLeast(session.role, minimumRole);
 }
 

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   createStoredAccount,
   hashPassword,
-  isBootstrapAdminCredential,
   parseBootstrapAccounts,
   resolveLoginMode,
   shouldUseSecureSessionCookie,
@@ -75,20 +74,13 @@ test('hashPassword and verifyPassword round-trip correctly', async () => {
   assert.equal(await verifyPassword('wrong-password', password.salt, password.hash), false);
 });
 
-test('bootstrap admin credential only accepts the configured admin password', () => {
-  assert.equal(isBootstrapAdminCredential('ADMIN', 'current-secret', 'current-secret'), true);
-  assert.equal(isBootstrapAdminCredential('admin', 'old-secret', 'current-secret'), false);
-  assert.equal(isBootstrapAdminCredential('viewer', 'current-secret', 'current-secret'), false);
-  assert.equal(isBootstrapAdminCredential('admin', '', ''), false);
-});
-
 test('signSessionPayload and verifySessionToken reject tampering', async () => {
   const token = await signSessionPayload({
     accountId: 'account-1',
     profileId: 'profile-1',
     username: 'alice',
     name: 'Alice',
-    role: 'super_admin',
+    role: 'admin',
     customPermissions: ['iptv_access'],
     mode: 'managed',
     iat: Date.now(),
@@ -104,13 +96,13 @@ test('signSessionPayload and verifySessionToken reject tampering', async () => {
   assert.equal(await verifySessionToken(tampered, 'test-secret'), null);
 });
 
-test('createStoredAccount stores hashed password and normalized permissions', async () => {
+test('createStoredAccount stores hashed password', async () => {
   const account = await createStoredAccount({
     username: 'alice',
     password: 'secret',
     name: 'Alice',
-    role: 'viewer',
-    customPermissions: ['iptv_access', 'iptv_builtin_sources'],
+    role: 'user',
+    customPermissions: [],
   });
 
   assert.equal(account.username, 'alice');
@@ -118,29 +110,26 @@ test('createStoredAccount stores hashed password and normalized permissions', as
   assert.equal(await verifyPassword('secret', account.passwordSalt, account.passwordHash), true);
 });
 
-test('MANAGED_AUTH_ENABLED does not bypass managed auth hard dependencies', () => {
+test('resolveLoginMode only enables managed mode with storage and accounts', () => {
   assert.equal(resolveLoginMode({
     managedAccountCount: 0,
     managedAuthEnabled: false,
-    managedAuthForced: true,
-    legacyAuthConfigured: true,
-  }), 'legacy_password');
+  }), 'none');
 
   assert.equal(resolveLoginMode({
-    managedAccountCount: 0,
+    managedAccountCount: 1,
     managedAuthEnabled: true,
-    managedAuthForced: true,
-    legacyAuthConfigured: true,
   }), 'managed');
 });
 
-test('resolvePermissions applies role defaults and IPTV management inheritance', () => {
-  const viewerPermissions = resolvePermissions('viewer', ['iptv_access']);
-  assert.ok(viewerPermissions.includes('iptv_access'));
-  assert.ok(viewerPermissions.includes('iptv_source_management'));
+test('resolvePermissions only grants admin full permissions', () => {
+  const userPermissions = resolvePermissions('user');
+  assert.ok(userPermissions.includes('iptv_access'));
+  assert.equal(userPermissions.includes('iptv_source_management'), false);
   assert.equal(hasResolvedPermission('admin', 'player_settings'), true);
-  assert.equal(hasResolvedPermission('viewer', 'account_management'), false);
-  assert.equal(hasRoleAtLeast('super_admin', 'admin'), true);
+  assert.equal(hasResolvedPermission('user', 'account_management'), false);
+  assert.equal(hasRoleAtLeast('admin', 'admin'), true);
+  assert.equal(hasRoleAtLeast('user', 'admin'), false);
 });
 
 test('session cookies are secure only for HTTPS production requests', () => {

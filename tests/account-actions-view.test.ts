@@ -23,5 +23,7 @@ test('premium settings includes the shared account management section', () => {
   );
 
   assert.match(source, /import \{ AccountSettings \} from '@\/components\/settings\/AccountSettings';/);
-  assert.match(source, /<AppVersionSettings \/>[\s\S]*?<AccountSettings \/>/);
+  assert.match(source, /<SettingsTabs/);
+  assert.match(source, /id: 'account'[\s\S]*?<AccountSettings \/>/);
+  assert.match(source, /id: 'about'[\s\S]*?<AppVersionSettings \/>/);
 });
