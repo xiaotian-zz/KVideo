@@ -1,13 +1,27 @@
-version: '3'
-
 services:
   kvideo:
+    build: .
     container_name: kvideo
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: always
+    restart: unless-stopped
     ports:
-      - 3000:3000
+      - '3001:3000'
     environment:
-      - NODE_ENV=production
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required in .env}
+      - AUTH_SECRET=${AUTH_SECRET:?AUTH_SECRET is required in .env}
+      - KVROCKS_URL=redis://kvideo-kvrocks:6666
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+    depends_on:
+      - kvideo-kvrocks
+
+  kvideo-kvrocks:
+    image: apache/kvrocks
+    container_name: kvideo-kvrocks
+    restart: unless-stopped
+    ports:
+      - '6666:6666'
+    volumes:
+      - kvrocks-data:/var/lib/kvrocks
+
+volumes:
+  kvrocks-data:

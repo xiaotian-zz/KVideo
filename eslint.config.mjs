@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     "build/**",
     ".vercel/**",
     "next-env.d.ts",
+    // 独立的严格验证链路，使用自身依赖，不参与应用 lint
+    "verification/**",
   ]),
 ]);
 

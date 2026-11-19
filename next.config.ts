@@ -40,6 +40,15 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'img9.doubanio.com',
       },
+      // 元数据图片代理可能使用任意豆瓣图片子域或 Bangumi 镜像
+      {
+        protocol: 'https',
+        hostname: '**.doubanio.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.lol',
+      },
       // Video source images - allow all subdomains with wildcards
       {
         protocol: 'http',
