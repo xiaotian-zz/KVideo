@@ -37,7 +37,6 @@ export function ScrollPositionManager() {
                 const maxAttempts = 10;
 
                 const tryScroll = () => {
-                    const currentScroll = window.scrollY;
                     window.scrollTo(0, position);
                     attempts++;
 

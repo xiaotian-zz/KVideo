@@ -25,24 +25,27 @@ export function useTVDetection(): boolean {
   const [isTV, setIsTV] = useState(false);
 
   useEffect(() => {
-    const ua = navigator.userAgent;
+    // 挂载后再检测，避免 effect 内同步 setState
+    queueMicrotask(() => {
+      const ua = navigator.userAgent;
 
-    // Check UA for TV indicators
-    const uaMatch = TV_USER_AGENT_PATTERNS.some(pattern => pattern.test(ua));
+      // Check UA for TV indicators
+      const uaMatch = TV_USER_AGENT_PATTERNS.some(pattern => pattern.test(ua));
 
-    if (uaMatch) {
-      setIsTV(true);
-      return;
-    }
+      if (uaMatch) {
+        setIsTV(true);
+        return;
+      }
 
-    // Fallback heuristic: large screen + no touch + low pixel density
-    const isLargeScreen = window.innerWidth >= 1280;
-    const hasNoTouch = !('ontouchstart' in window) && navigator.maxTouchPoints === 0;
-    const lowDensity = window.devicePixelRatio <= 1.5;
+      // Fallback heuristic: large screen + no touch + low pixel density
+      const isLargeScreen = window.innerWidth >= 1280;
+      const hasNoTouch = !('ontouchstart' in window) && navigator.maxTouchPoints === 0;
+      const lowDensity = window.devicePixelRatio <= 1.5;
 
-    if (isLargeScreen && hasNoTouch && lowDensity) {
-      setIsTV(true);
-    }
+      if (isLargeScreen && hasNoTouch && lowDensity) {
+        setIsTV(true);
+      }
+    });
   }, []);
 
   return isTV;

@@ -10,21 +10,29 @@ interface ThemeContextType {
   actualTheme: 'light' | 'dark';
 }
 
+interface ViewTransitionLike {
+  skipTransition: () => void;
+  finished: Promise<void>;
+}
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('system');
   const [actualTheme, setActualTheme] = useState<'light' | 'dark'>('dark');
   const [mounted, setMounted] = useState(false);
-  const transitionRef = React.useRef<any>(null);
+  const transitionRef = React.useRef<ViewTransitionLike | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-    // Load saved theme
-    const saved = localStorage.getItem('theme') as Theme;
-    if (saved) {
-      setTheme(saved);
-    }
+    // 延迟到挂载后再读取 localStorage，避免 SSR 水合不一致
+    queueMicrotask(() => {
+      setMounted(true);
+      // Load saved theme
+      const saved = localStorage.getItem('theme') as Theme;
+      if (saved) {
+        setTheme(saved);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -44,7 +52,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (transitionRef.current) {
         try {
           transitionRef.current.skipTransition();
-        } catch (e) {
+        } catch {
           // Ignore if transition already finished
         }
       }
@@ -56,24 +64,24 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Check if View Transition API is supported
-      // @ts-ignore - View Transition API is experimental
-      if (typeof document.startViewTransition === 'function') {
+      const doc = document as Document & {
+        startViewTransition?: (updateCallback: () => void) => ViewTransitionLike;
+      };
+      if (typeof doc.startViewTransition === 'function') {
         try {
-          // @ts-ignore
-          transitionRef.current = document.startViewTransition(() => {
+          const transition = doc.startViewTransition(() => {
             applyTheme();
           });
-          
+          transitionRef.current = transition;
+
           // Clear ref after transition completes or fails
-          if (transitionRef.current) {
-            transitionRef.current.finished
-              .then(() => { transitionRef.current = null; })
-              .catch((error: Error) => { 
-                // Silently handle transition errors (visibility changes, etc.)
-                transitionRef.current = null;
-              });
-          }
-        } catch (error) {
+          transition.finished
+            .then(() => { transitionRef.current = null; })
+            .catch(() => {
+              // Silently handle transition errors (visibility changes, etc.)
+              transitionRef.current = null;
+            });
+        } catch {
           // Fallback if transition fails to start
           applyTheme();
         }
@@ -99,7 +107,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (document.hidden && transitionRef.current) {
         try {
           transitionRef.current.skipTransition();
-        } catch (e) {
+        } catch {
           // Ignore
         }
         transitionRef.current = null;
@@ -116,7 +124,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (transitionRef.current) {
         try {
           transitionRef.current.skipTransition();
-        } catch (e) {
+        } catch {
           // Ignore
         }
       }

@@ -87,7 +87,8 @@ export function useResolutionProbe(videos: VideoToProbe[]): {
     }
 
     if (Object.keys(cached).length > 0) {
-      setResolutions((previous) => ({ ...previous, ...cached }));
+      // 合并缓存后立即刷新会触发级联渲染，改为微任务异步更新
+      queueMicrotask(() => setResolutions((previous) => ({ ...previous, ...cached })));
     }
 
     if (needProbe.length === 0) return;
@@ -96,9 +97,8 @@ export function useResolutionProbe(videos: VideoToProbe[]): {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setIsProbing(true);
-
     (async () => {
+      setIsProbing(true);
       try {
         const sourceConfigs = getSourceConfigsForProbe(needProbe);
         const response = await fetch('/api/probe-resolution', {
