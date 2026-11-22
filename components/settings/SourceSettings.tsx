@@ -5,7 +5,9 @@ import { DEFAULT_SOURCES } from '@/lib/api/default-sources';
 
 interface SourceSettingsProps {
     sources: VideoSource[];
+    premiumSources: VideoSource[];
     onSourcesChange: (sources: VideoSource[]) => void;
+    onPremiumSourcesChange: (sources: VideoSource[]) => void;
     onRestoreDefaults: () => void;
     onAddSource: () => void;
     onEditSource?: (source: VideoSource) => void;
@@ -13,7 +15,9 @@ interface SourceSettingsProps {
 
 export function SourceSettings({
     sources,
+    premiumSources,
     onSourcesChange,
+    onPremiumSourcesChange,
     onRestoreDefaults,
     onAddSource,
     onEditSource,
@@ -55,6 +59,34 @@ export function SourceSettings({
         // Update priorities
         updated.forEach((s, idx) => s.priority = idx + 1);
         onSourcesChange(updated);
+    };
+
+    const filteredPremiumSources = premiumSources.filter(source =>
+        source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        source.baseUrl.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const handlePremiumToggle = (id: string) => {
+        onPremiumSourcesChange(
+            premiumSources.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)
+        );
+    };
+
+    const handlePremiumDelete = (id: string) => {
+        onPremiumSourcesChange(premiumSources.filter(s => s.id !== id));
+    };
+
+    const handlePremiumReorder = (id: string, direction: 'up' | 'down') => {
+        const currentIndex = premiumSources.findIndex(s => s.id === id);
+        if (currentIndex === -1) return;
+
+        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (newIndex < 0 || newIndex >= premiumSources.length) return;
+
+        const updated = [...premiumSources];
+        [updated[currentIndex], updated[newIndex]] = [updated[newIndex], updated[currentIndex]];
+        updated.forEach((s, idx) => s.priority = idx + 1);
+        onPremiumSourcesChange(updated);
     };
 
     return (
@@ -115,6 +147,34 @@ export function SourceSettings({
                     {showAllSources ? '收起' : `显示全部 (${sources.length})`}
                 </button>
             )}
+
+            <div className="mt-8 pt-6 border-t border-[var(--glass-border)]">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <h3 className="text-base font-semibold text-[var(--text-color)]">18+ 源</h3>
+                    <span className="px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
+                        18+
+                    </span>
+                </div>
+                <p className="text-sm text-[var(--text-color-secondary)] mb-4">
+                    共 {premiumSources.length} 个，与普通源一起在本页管理
+                </p>
+
+                {filteredPremiumSources.length === 0 ? (
+                    <div className="px-4 py-6 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--text-color-secondary)] text-center">
+                        {searchQuery ? '没有匹配的 18+ 源' : '暂无 18+ 源，可在添加源时选择「18+ 源」'}
+                    </div>
+                ) : (
+                    <SourceManager
+                        sources={filteredPremiumSources}
+                        onToggle={handlePremiumToggle}
+                        onDelete={handlePremiumDelete}
+                        onReorder={handlePremiumReorder}
+                        onEdit={onEditSource}
+                        defaultIds={[]}
+                        premium
+                    />
+                )}
+            </div>
         </div>
     );
 }

@@ -87,6 +87,16 @@ export function useSettingsPage() {
         pushGlobalConfig();
     };
 
+    const handlePremiumSourcesChange = (newSources: VideoSource[]) => {
+        setPremiumSources(newSources);
+        const currentSettings = settingsStore.getSettings();
+        settingsStore.saveSettings({
+            ...currentSettings,
+            premiumSources: newSources,
+        });
+        pushGlobalConfig();
+    };
+
     const handleAddSource = (source: VideoSource) => {
         const currentSettings = settingsStore.getSettings();
         const nextSources = currentSettings.sources.filter(s => s.id !== source.id);
@@ -407,6 +417,7 @@ export function useSettingsPage() {
         setIsRestoreDefaultsDialogOpen,
         setEditingSource,
         handleSourcesChange,
+        handlePremiumSourcesChange,
         handleAddSource,
         handleSortChange,
         handleExport,

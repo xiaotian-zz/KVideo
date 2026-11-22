@@ -115,7 +115,7 @@ export function AddSourceModal({ isOpen, onClose, onAdd, existingIds, initialVal
                 </button>
               </div>
               <p className="mt-1 text-xs text-[var(--text-color-secondary)]">
-                18+ 源仅在高级模式中显示和使用
+                18+ 源会在列表中单独标记，用于区分成人内容源
               </p>
             </div>
 

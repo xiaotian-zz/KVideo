@@ -38,6 +38,7 @@ export default function SettingsPage() {
     setIsResetDialogOpen,
     setIsRestoreDefaultsDialogOpen,
     handleSourcesChange,
+    handlePremiumSourcesChange,
     handleAddSource,
     handleSortChange,
     handleExport,
@@ -98,7 +99,9 @@ export default function SettingsPage() {
                   </p>
                   <SourceSettings
                     sources={sources}
+                    premiumSources={premiumSources}
                     onSourcesChange={handleSourcesChange}
+                    onPremiumSourcesChange={handlePremiumSourcesChange}
                     onRestoreDefaults={() => setIsRestoreDefaultsDialogOpen(true)}
                     onAddSource={() => {
                       setEditingSource(null);
