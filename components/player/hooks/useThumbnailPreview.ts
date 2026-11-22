@@ -2,16 +2,23 @@
 
 /**
  * 进度条缩略图预览。
- * 思路参考 ArtPlayer 的 auto-thumbnail 插件：用隐藏 video 在目标时间点 seek 后抽帧。
- * 针对 HLS 做了适配：隐藏 video 通过独立的 hls.js 实例加载，抽帧按需进行并缓存。
+ * 思路参考 ArtPlayer 的 auto-thumbnail 插件：在多个时间点抽帧并缓存。
+ * 针对 HLS 做了适配：隐藏 video 通过独立的 hls.js 实例加载，帧按需优先生成，
+ * 然后再后台逐步补齐整部视频的缩略图。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 
 const THUMBNAIL_WIDTH = 320;
-const CACHE_LIMIT = 60;
-const SEEK_DEBOUNCE_MS = 150;
+const MAX_FRAMES = 180;
+const SECONDS_PER_FRAME = 4;
+const GENERATE_INTERVAL_MS = 60;
+
+function getFrameCount(duration: number): number {
+  if (!Number.isFinite(duration) || duration <= 0) return 0;
+  return Math.min(MAX_FRAMES, Math.max(24, Math.round(duration / SECONDS_PER_FRAME)));
+}
 
 interface ThumbnailPreviewResult {
   imageUrl: string | null;
@@ -31,24 +38,37 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
   const readyRef = useRef(false);
   const destroyedRef = useRef(false);
   const unavailableRef = useRef(false);
-  const seekingRef = useRef(false);
-  const pendingTimeRef = useRef<number | null>(null);
-  const cacheRef = useRef<Map<number, string>>(new Map());
+  const frameCountRef = useRef(0);
+  const framesRef = useRef<Map<number, string>>(new Map());
+  const queueRef = useRef<number[]>([]);
+  const queuedRef = useRef<Set<number>>(new Set());
+  const generatingRef = useRef(false);
+  const requestedIndexRef = useRef<number | null>(null);
   const debounceRef = useRef<number | null>(null);
+  const generateTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     destroyedRef.current = false;
     readyRef.current = false;
     unavailableRef.current = false;
-    seekingRef.current = false;
-    pendingTimeRef.current = null;
-    cacheRef.current.clear();
+    generatingRef.current = false;
+    requestedIndexRef.current = null;
+    frameCountRef.current = getFrameCount(duration);
+    framesRef.current.clear();
+    queueRef.current = [];
+    queuedRef.current.clear();
+    setImageUrl(null);
+    setLoading(false);
 
     return () => {
       destroyedRef.current = true;
       if (debounceRef.current !== null) {
         window.clearTimeout(debounceRef.current);
         debounceRef.current = null;
+      }
+      if (generateTimerRef.current !== null) {
+        window.clearTimeout(generateTimerRef.current);
+        generateTimerRef.current = null;
       }
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -63,11 +83,49 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
       videoRef.current = null;
       canvasRef.current = null;
       readyRef.current = false;
-      seekingRef.current = false;
+      generatingRef.current = false;
+      queueRef.current = [];
+      queuedRef.current.clear();
+      framesRef.current.clear();
     };
-  }, [src]);
+  }, [duration, src]);
 
-  const drawFrame = useCallback(() => {
+  const indexToTime = useCallback((index: number) => {
+    const count = frameCountRef.current;
+    if (count <= 1) return 0;
+    return (duration * index) / (count - 1);
+  }, [duration]);
+
+  const timeToIndex = useCallback((targetTime: number) => {
+    const count = frameCountRef.current;
+    if (count <= 1 || !Number.isFinite(duration) || duration <= 0) return 0;
+    const ratio = Math.min(Math.max(targetTime / duration, 0), 1);
+    return Math.round(ratio * (count - 1));
+  }, [duration]);
+
+  const findNearestFrame = useCallback((index: number): string | null => {
+    const frames = framesRef.current;
+    if (frames.size === 0) return null;
+    let bestKey: number | null = null;
+    for (const key of frames.keys()) {
+      if (bestKey === null || Math.abs(key - index) < Math.abs(bestKey - index)) {
+        bestKey = key;
+      }
+    }
+    return bestKey === null ? null : frames.get(bestKey) ?? null;
+  }, []);
+
+  const refreshDisplay = useCallback(() => {
+    const target = requestedIndexRef.current;
+    if (target === null) return;
+    const nearest = findNearestFrame(target);
+    if (nearest) {
+      setImageUrl(nearest);
+      setLoading(false);
+    }
+  }, [findNearestFrame]);
+
+  const drawFrame = useCallback((index: number) => {
     const video = videoRef.current;
     if (!video || destroyedRef.current) return;
 
@@ -91,17 +149,13 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
 
       ctx.drawImage(video, 0, 0, width, height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      framesRef.current.set(index, dataUrl);
 
-      const key = Math.round(video.currentTime);
-      const cache = cacheRef.current;
-      cache.set(key, dataUrl);
-      if (cache.size > CACHE_LIMIT) {
-        const oldestKey = cache.keys().next().value;
-        if (oldestKey !== undefined) cache.delete(oldestKey);
+      const target = requestedIndexRef.current;
+      if (target !== null && Math.abs(target - index) <= 1) {
+        setImageUrl(dataUrl);
+        setLoading(false);
       }
-
-      setImageUrl(dataUrl);
-      setLoading(false);
     } catch {
       // 跨域或解码失败则关闭预览，不影响播放
       unavailableRef.current = true;
@@ -109,40 +163,59 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
     }
   }, []);
 
-  const seekToPendingTime = useCallback(() => {
+  const processQueue = useCallback(() => {
+    if (destroyedRef.current || unavailableRef.current || generatingRef.current) return;
+
     const video = videoRef.current;
-    if (!video || destroyedRef.current || unavailableRef.current) return;
-    if (!readyRef.current || seekingRef.current) return;
+    if (!video) return;
 
-    const target = pendingTimeRef.current;
-    if (target === null) return;
-
-    const cached = cacheRef.current.get(Math.round(target));
-    if (cached) {
-      pendingTimeRef.current = null;
-      setImageUrl(cached);
-      setLoading(false);
+    if (!readyRef.current) {
+      // 元数据就绪后会再次触发
       return;
     }
 
-    pendingTimeRef.current = null;
-    seekingRef.current = true;
+    const index = queueRef.current.shift();
+    if (index === undefined) {
+      setLoading(false);
+      return;
+    }
+    queuedRef.current.delete(index);
 
-    const onSeeked = () => {
-      seekingRef.current = false;
-      drawFrame();
-      seekToPendingTime();
+    if (framesRef.current.has(index)) {
+      refreshDisplay();
+      processQueue();
+      return;
+    }
+
+    generatingRef.current = true;
+    const targetTime = Math.min(Math.max(indexToTime(index), 0), Math.max(duration - 0.1, 0));
+
+    const finish = () => {
+      generatingRef.current = false;
+      refreshDisplay();
+      if (generateTimerRef.current !== null) {
+        window.clearTimeout(generateTimerRef.current);
+      }
+      generateTimerRef.current = window.setTimeout(() => {
+        generateTimerRef.current = null;
+        processQueue();
+      }, GENERATE_INTERVAL_MS);
     };
 
-    if (Math.abs(video.currentTime - target) < 0.25) {
-      seekingRef.current = false;
-      drawFrame();
+    const onSeeked = () => {
+      drawFrame(index);
+      finish();
+    };
+
+    if (Math.abs(video.currentTime - targetTime) < 0.2) {
+      drawFrame(index);
+      finish();
       return;
     }
 
     video.addEventListener('seeked', onSeeked, { once: true });
-    video.currentTime = target;
-  }, [drawFrame]);
+    video.currentTime = targetTime;
+  }, [drawFrame, duration, indexToTime, refreshDisplay]);
 
   const ensureVideo = useCallback(() => {
     if (videoRef.current || destroyedRef.current || !src) return;
@@ -170,7 +243,7 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
         if (hls.levels.length > 0) {
           hls.currentLevel = 0;
         }
-        seekToPendingTime();
+        processQueue();
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
@@ -186,19 +259,42 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
       video.addEventListener('loadedmetadata', () => {
         if (destroyedRef.current) return;
         readyRef.current = true;
-        seekToPendingTime();
+        processQueue();
       }, { once: true });
       video.addEventListener('error', () => {
         unavailableRef.current = true;
         setLoading(false);
       }, { once: true });
     }
-  }, [src, seekToPendingTime]);
+  }, [processQueue, src]);
+
+  const enqueueAround = useCallback((target: number) => {
+    const count = frameCountRef.current;
+    if (count <= 0) return;
+
+    const enqueue = (index: number, priority: boolean) => {
+      if (index < 0 || index >= count) return;
+      if (framesRef.current.has(index) || queuedRef.current.has(index)) return;
+      queuedRef.current.add(index);
+      if (priority) {
+        queueRef.current.unshift(index);
+      } else {
+        queueRef.current.push(index);
+      }
+    };
+
+    enqueue(target, true);
+    for (let distance = 1; distance < count; distance += 1) {
+      enqueue(target + distance, false);
+      enqueue(target - distance, false);
+    }
+  }, []);
 
   const requestPreview = useCallback((nextTime: number | null) => {
     if (nextTime === null) {
       setTime(null);
       setLoading(false);
+      requestedIndexRef.current = null;
       if (debounceRef.current !== null) {
         window.clearTimeout(debounceRef.current);
         debounceRef.current = null;
@@ -216,25 +312,27 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
 
     if (unavailableRef.current) return;
 
-    const cached = cacheRef.current.get(Math.round(clamped));
-    if (cached) {
-      setImageUrl(cached);
-      setLoading(false);
-      return;
-    }
+    const index = timeToIndex(clamped);
+    requestedIndexRef.current = index;
 
-    setLoading(true);
+    const nearest = findNearestFrame(index);
+    if (nearest) {
+      setImageUrl(nearest);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
 
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
     }
     debounceRef.current = window.setTimeout(() => {
       debounceRef.current = null;
-      pendingTimeRef.current = clamped;
       ensureVideo();
-      seekToPendingTime();
-    }, SEEK_DEBOUNCE_MS);
-  }, [duration, ensureVideo, seekToPendingTime, src]);
+      enqueueAround(index);
+      processQueue();
+    }, 80);
+  }, [duration, ensureVideo, enqueueAround, findNearestFrame, processQueue, src, timeToIndex]);
 
   return { imageUrl, time, loading, requestPreview };
 }
