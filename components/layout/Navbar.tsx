@@ -91,9 +91,9 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
                                             {session.name.charAt(0)}
                                         </div>
                                         <span className="text-[var(--text-color)] max-w-[60px] truncate">{session.name}</span>
-                                        {session.role === 'admin' && (
+                                        {(session.role === 'admin' || session.role === 'premium') && (
                                             <span className="px-1 py-0.5 bg-[var(--accent-color)]/10 text-[var(--accent-color)] rounded text-[10px] font-medium">
-                                                管理员
+                                                {session.role === 'admin' ? '管理员' : '高级会员'}
                                             </span>
                                         )}
                                     </div>

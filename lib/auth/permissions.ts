@@ -1,12 +1,13 @@
 /**
- * 角色模型：系统只保留管理员和普通用户两种角色。
+ * 角色模型：系统保留管理员、高级会员和普通用户三种角色。
  * - admin：可使用后台与全部设置
+ * - premium：可使用普通功能与高级内容，但不能进入后台
  * - user：仅可使用普通观看相关功能
  *
  * 历史数据中的 super_admin / admin 统一归并为 admin，
  * viewer 及其他未知值统一归并为 user。
  */
-export type Role = 'admin' | 'user';
+export type Role = 'admin' | 'premium' | 'user';
 
 export type Permission =
   | 'source_management'
@@ -35,22 +36,26 @@ export const ALL_PERMISSIONS: Permission[] = [
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   admin: ALL_PERMISSIONS,
+  premium: ['view_settings', 'iptv_access'],
   user: ['view_settings', 'iptv_access'],
 };
 
 export function isRole(value: string | undefined | null): value is Role {
-  return value === 'admin' || value === 'user';
+  return value === 'admin' || value === 'premium' || value === 'user';
 }
 
 export function normalizeRole(value: string | undefined | null): Role {
-  if (value === 'admin' || value === 'super_admin' || value === 'user' || value === 'viewer') {
-    return value === 'admin' || value === 'super_admin' ? 'admin' : 'user';
-  }
+  if (value === 'admin' || value === 'super_admin') return 'admin';
+  if (value === 'premium' || value === 'vip') return 'premium';
   return 'user';
 }
 
 export function isAdminRole(value: string | undefined | null): boolean {
   return normalizeRole(value) === 'admin';
+}
+
+export function isPremiumRole(value: string | undefined | null): boolean {
+  return normalizeRole(value) === 'premium';
 }
 
 export function isPermission(value: string | undefined | null): value is Permission {

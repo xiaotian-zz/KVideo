@@ -17,6 +17,7 @@ interface AccountInfo {
 
 const ROLE_LABELS: Record<Role, string> = {
   admin: '管理员',
+  premium: '高级会员',
   user: '普通用户',
 };
 
@@ -219,7 +220,7 @@ export function AccountSettings() {
               账户信息保存在 Kvrocks 中，修改会立即生效。
             </p>
             <p className="text-xs text-[var(--text-color-secondary)]">
-              管理员可使用全部设置；普通用户仅可使用观看相关功能。系统始终至少保留一名管理员。
+              管理员可使用全部设置；高级会员可访问高级内容；普通用户仅可使用普通观看功能。系统始终至少保留一名管理员。
             </p>
           </div>
         </div>
@@ -270,6 +271,7 @@ export function AccountSettings() {
               className={INPUT_CLASS}
             >
               <option value="user">普通用户</option>
+              <option value="premium">高级会员</option>
               <option value="admin">管理员</option>
             </select>
           </div>
@@ -350,6 +352,7 @@ export function AccountSettings() {
                         className="px-3 py-1.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-full)] text-xs text-[var(--text-color)] focus:outline-none focus:border-[var(--accent-color)] disabled:opacity-50"
                       >
                         <option value="user">普通用户</option>
+                        <option value="premium">高级会员</option>
                         <option value="admin">管理员</option>
                       </select>
                     </div>

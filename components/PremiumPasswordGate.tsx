@@ -27,12 +27,12 @@ export function PremiumPasswordGate({ children }: { children: React.ReactNode })
                 if (!configRes.ok) throw new Error('Failed to fetch auth config');
                 const data = await configRes.json();
                 const sessionData = sessionRes.ok ? await sessionRes.json() : null;
-                const isAdminSession = !!sessionData?.session &&
-                    sessionData.session.role === 'admin';
+                const privilegedSession = !!sessionData?.session &&
+                    (sessionData.session.role === 'admin' || sessionData.session.role === 'premium');
 
                 if (mounted) {
-                    // If no premium password configured, allow access
-                    setIsLocked(data.hasPremiumAuth && !unlocked && !isAdminSession);
+                    // 管理员与高级会员无需额外密码；没有配置高级密码时也直接放行
+                    setIsLocked(data.hasPremiumAuth && !unlocked && !privilegedSession);
                     setIsClient(true);
                 }
             } catch {
