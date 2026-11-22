@@ -22,6 +22,7 @@ async function searchVideosBySource(
     url.searchParams.set('pg', page.toString());
 
     try {
+        // 搜索覆盖大量源，失败直接跳过，不做重试，避免失败源成倍放大请求量
         const response = await withRetry(async () => {
             const res = await fetchWithTimeout(url.toString(), {
                 method: 'GET',
@@ -37,7 +38,7 @@ async function searchVideosBySource(
             }
 
             return res;
-        });
+        }, 0);
 
         const data: ApiSearchResponse = await response.json();
 

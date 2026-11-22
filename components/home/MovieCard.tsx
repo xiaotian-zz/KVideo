@@ -22,6 +22,7 @@ interface MovieCardProps {
   onMovieClick: (movie: DoubanMovie) => void;
   href?: string;
   openInNewTab?: boolean;
+  imageLoading?: 'eager' | 'lazy';
 }
 
 type ImageStage = 'direct' | 'proxy' | 'placeholder' | 'none';
@@ -31,6 +32,7 @@ export const MovieCard = memo(function MovieCard({
   onMovieClick,
   href,
   openInNewTab = false,
+  imageLoading = 'eager',
 }: MovieCardProps) {
   const hasExternalCover = /^https?:\/\//i.test(movie.cover);
   const [imageStage, setImageStage] = useState<ImageStage>(() =>
@@ -98,8 +100,8 @@ export const MovieCard = memo(function MovieCard({
               alt={movie.title}
               fill
               className="object-cover transition-transform duration-300 group-hover:scale-105 rounded-[var(--radius-2xl)]"
-              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-              loading="eager"
+              sizes="(max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+              loading={imageLoading}
               unoptimized
               referrerPolicy="no-referrer"
               onError={handleImageError}

@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { Globe } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { CategoryPills } from '@/components/ui/CategoryPills';
 import { MovieCard } from '@/components/home/MovieCard';
@@ -21,6 +22,8 @@ interface SourceVideo {
   cover: string;
   remarks?: string;
   typeName?: string;
+  year?: string;
+  area?: string;
 }
 
 function getPageItems(current: number, total: number): Array<number | 'ellipsis'> {
@@ -54,7 +57,19 @@ export default function SourceBrowserPage() {
   const [pagecount, setPagecount] = useState(1);
   const [jumpPage, setJumpPage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyword, setKeyword] = useState('');
+  const [mode, setMode] = useState<'category' | 'search'>('category');
+  const [sortBy, setSortBy] = useState<
+    'default' | 'title-asc' | 'title-desc' | 'year-asc' | 'year-desc'
+  >('default');
+  const [filterYear, setFilterYear] = useState('');
+  const [filterKeyword, setFilterKeyword] = useState('');
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
   const requestIdRef = useRef(0);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listAbortRef = useRef<AbortController | null>(null);
+  const categoryAbortRef = useRef<AbortController | null>(null);
+  const categoryRequestIdRef = useRef(0);
 
   useEffect(() => {
     const syncSources = (settings: AppSettings) => {
@@ -84,35 +99,58 @@ export default function SourceBrowserPage() {
     });
   }, []);
 
-  const loadItems = useCallback(async (sourceId: string, typeId: string, pageNumber: number) => {
+  const loadItems = useCallback(async (
+    sourceId: string,
+    typeId: string,
+    pageNumber: number,
+    searchKeyword = ''
+  ) => {
     const requestId = ++requestIdRef.current;
     setLoading(true);
 
+    // 取消上一次列表请求，避免快速点击时请求堆积
+    listAbortRef.current?.abort();
+    const controller = new AbortController();
+    listAbortRef.current = controller;
+
     try {
       const params = new URLSearchParams({
-        action: 'list',
+        action: searchKeyword ? 'search' : 'list',
         sourceId,
         page: String(pageNumber),
       });
-      if (typeId) params.set('typeId', typeId);
+      if (searchKeyword) params.set('keyword', searchKeyword);
+      else if (typeId) params.set('typeId', typeId);
 
-      const response = await fetch(`/api/source-browser?${params.toString()}`, { cache: 'no-store' });
+      const response = await fetch(`/api/source-browser?${params.toString()}`, {
+        signal: controller.signal,
+      });
       const result = await response.json();
 
       if (requestId !== requestIdRef.current) return;
 
       const data = result.data;
       if (!data) {
-        if (pageNumber === 1) setItems([]);
+        if (pageNumber === 1) {
+          setItems([]);
+          setAvailableYears([]);
+        }
         return;
       }
 
+      const nextItems: SourceVideo[] = Array.isArray(data.items) ? data.items : [];
       setPage(pageNumber);
       setPagecount(Number(data.pagecount) || 1);
-      setItems(data.items);
+      setItems(nextItems);
+
+      const years = Array.from(
+        new Set(nextItems.map((item) => (item.year || '').trim()).filter(Boolean))
+      ).sort((left, right) => (parseInt(right, 10) || 0) - (parseInt(left, 10) || 0));
+      setAvailableYears(years);
     } catch {
       if (requestId === requestIdRef.current && pageNumber === 1) {
         setItems([]);
+        setAvailableYears([]);
       }
     } finally {
       if (requestId === requestIdRef.current) {
@@ -127,20 +165,40 @@ export default function SourceBrowserPage() {
     setItems([]);
     setPage(1);
     setPagecount(1);
+    setKeyword('');
+    setMode('category');
+    setFilterYear('');
+    setFilterKeyword('');
+    setAvailableYears([]);
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+
+    // 切换源时取消上一次分类和列表请求
+    const categoryRequestId = ++categoryRequestIdRef.current;
+    categoryAbortRef.current?.abort();
+    listAbortRef.current?.abort();
+    const controller = new AbortController();
+    categoryAbortRef.current = controller;
 
     let list: SourceCategory[] = [];
 
     try {
       const response = await fetch(
         `/api/source-browser?action=categories&sourceId=${encodeURIComponent(sourceId)}`,
-        { cache: 'no-store' }
+        { signal: controller.signal }
       );
       const result = await response.json();
+      if (categoryRequestId !== categoryRequestIdRef.current) return;
       list = Array.isArray(result.data?.categories) ? result.data.categories : [];
       setCategories(list);
     } catch {
+      if (categoryRequestId !== categoryRequestIdRef.current) return;
       setCategories([]);
     }
+
+    if (categoryRequestId !== categoryRequestIdRef.current) return;
 
     // 默认显示第一个源的第一个标签
     const firstType = list[0]?.id || '';
@@ -151,6 +209,8 @@ export default function SourceBrowserPage() {
   }, [loadItems]);
 
   useEffect(() => {
+    // 源列表变化后同步默认选中项并加载分类
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (sources.length === 0) {
       setActiveSourceId('');
       setCategories([]);
@@ -163,6 +223,7 @@ export default function SourceBrowserPage() {
       setActiveSourceId(first.id);
       void loadCategories(first.id);
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [sources, activeSourceId, loadCategories]);
 
   const handleSourceChange = (sourceId: string) => {
@@ -172,13 +233,108 @@ export default function SourceBrowserPage() {
   };
 
   const handleTypeChange = (typeId: string) => {
-    if (typeId === activeType) return;
+    if (typeId === activeType && mode === 'category') return;
     setActiveType(typeId);
+    setMode('category');
+    setKeyword('');
     setItems([]);
     setPage(1);
     setPagecount(1);
     void loadItems(activeSourceId, typeId, 1);
   };
+
+  const applySearch = useCallback((value: string) => {
+    const query = value.trim();
+    if (query) {
+      setMode('search');
+      void loadItems(activeSourceId, activeType, 1, query);
+      return;
+    }
+
+    setMode('category');
+    if (activeType) {
+      void loadItems(activeSourceId, activeType, 1);
+    }
+  }, [activeSourceId, activeType, loadItems]);
+
+  const handleKeywordChange = (value: string) => {
+    setKeyword(value);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => applySearch(value), 500);
+  };
+
+  const handleKeywordKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    applySearch(keyword);
+  };
+
+  const clearSearch = () => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    setKeyword('');
+    setMode('category');
+    setFilterYear('');
+    setFilterKeyword('');
+    if (activeType) {
+      void loadItems(activeSourceId, activeType, 1);
+    }
+  };
+
+  const fetchPage = useCallback((pageNumber: number) => {
+    void loadItems(
+      activeSourceId,
+      activeType,
+      pageNumber,
+      mode === 'search' ? keyword.trim() : ''
+    );
+  }, [activeSourceId, activeType, mode, keyword, loadItems]);
+
+  const displayedItems = useMemo(() => {
+    let result = [...items];
+
+    if (filterKeyword.trim()) {
+      const query = filterKeyword.trim().toLowerCase();
+      result = result.filter(
+        (item) =>
+          item.title.toLowerCase().includes(query) ||
+          (item.remarks || '').toLowerCase().includes(query)
+      );
+    }
+
+    if (filterYear) {
+      result = result.filter((item) => (item.year || '').trim() === filterYear);
+    }
+
+    switch (sortBy) {
+      case 'title-asc':
+        return result.sort((left, right) => left.title.localeCompare(right.title));
+      case 'title-desc':
+        return result.sort((left, right) => right.title.localeCompare(left.title));
+      case 'year-asc':
+        return result.sort(
+          (left, right) => (parseInt(left.year || '', 10) || 0) - (parseInt(right.year || '', 10) || 0)
+        );
+      case 'year-desc':
+        return result.sort(
+          (left, right) => (parseInt(right.year || '', 10) || 0) - (parseInt(left.year || '', 10) || 0)
+        );
+      default:
+        return result;
+    }
+  }, [items, sortBy, filterYear, filterKeyword]);
+
+  useEffect(() => () => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+  }, []);
+
+  const currentSource = sources.find((source) => source.id === activeSourceId);
 
   return (
     <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
@@ -202,7 +358,76 @@ export default function SourceBrowserPage() {
               onChange={handleSourceChange}
             />
 
-            {categories.length > 0 && (
+            {currentSource && (
+              <div className="rounded-[var(--radius-2xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={keyword}
+                    onChange={(event) => handleKeywordChange(event.target.value)}
+                    onKeyDown={handleKeywordKeyDown}
+                    placeholder="输入关键词并回车进行搜索；清空回车恢复分类"
+                    className="flex-1 min-w-0 rounded-md border border-[var(--glass-border)] bg-[var(--bg-color)] px-3 py-2 text-sm text-[var(--text-color)] outline-none transition-colors focus:border-[var(--accent-color)]"
+                  />
+                  {keyword && (
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      className="shrink-0 rounded-md border border-[var(--glass-border)] px-3 py-2 text-xs text-[var(--text-color-secondary)] transition-colors hover:bg-[color-mix(in_srgb,var(--text-color)_6%,transparent)] cursor-pointer"
+                    >
+                      清除
+                    </button>
+                  )}
+                  <div className="hidden sm:block whitespace-nowrap text-xs text-[var(--text-color-secondary)]">
+                    {mode === 'search' ? '搜索' : '分类'}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+                    title="排序"
+                    className="rounded-md border border-[var(--glass-border)] bg-[var(--bg-color)] px-2 py-2 text-xs text-[var(--text-color)] outline-none sm:flex-1 sm:min-w-[120px] sm:px-3 sm:text-sm"
+                  >
+                    <option value="default">默认</option>
+                    <option value="title-asc">标题 A→Z</option>
+                    <option value="title-desc">标题 Z→A</option>
+                    <option value="year-asc">年份↑</option>
+                    <option value="year-desc">年份↓</option>
+                  </select>
+
+                  <select
+                    value={filterYear}
+                    onChange={(event) => setFilterYear(event.target.value)}
+                    title="年份"
+                    className="rounded-md border border-[var(--glass-border)] bg-[var(--bg-color)] px-2 py-2 text-xs text-[var(--text-color)] outline-none sm:flex-1 sm:min-w-[100px] sm:px-3 sm:text-sm"
+                  >
+                    <option value="">全部年份</option>
+                    {availableYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    value={filterKeyword}
+                    onChange={(event) => setFilterKeyword(event.target.value)}
+                    placeholder="地区/关键词"
+                    className="col-span-2 rounded-md border border-[var(--glass-border)] bg-[var(--bg-color)] px-2 py-2 text-xs text-[var(--text-color)] outline-none transition-colors focus:border-[var(--accent-color)] sm:flex-1 sm:min-w-[140px] sm:px-3 sm:text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {currentSource && (
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-color)]">
+                <Globe size={16} className="text-[var(--accent-color)]" />
+                <span>{currentSource.name} 分类</span>
+              </div>
+            )}
+
+            {mode === 'category' && categories.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {categories.map((category) => {
                   const isActive = category.id === activeType;
@@ -226,7 +451,7 @@ export default function SourceBrowserPage() {
             )}
 
             {loading && items.length === 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
                 {Array.from({ length: 10 }).map((_, index) => (
                   <div
                     key={index}
@@ -234,14 +459,14 @@ export default function SourceBrowserPage() {
                   />
                 ))}
               </div>
-            ) : items.length === 0 ? (
+            ) : displayedItems.length === 0 ? (
               <div className="text-center py-20 text-sm text-[var(--text-color-secondary)]">
-                该源暂无内容
+                {items.length === 0 ? '该源暂无内容' : '没有匹配的内容'}
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {items.map((item) => {
+                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                  {displayedItems.map((item, index) => {
                     const activeSource = sources.find((source) => source.id === activeSourceId);
                     const playerParams = new URLSearchParams({
                       id: item.id,
@@ -267,6 +492,7 @@ export default function SourceBrowserPage() {
                           url: '',
                         }}
                         onMovieClick={() => {}}
+                        imageLoading={index < 6 ? 'eager' : 'lazy'}
                       />
                     );
                   })}
@@ -277,7 +503,7 @@ export default function SourceBrowserPage() {
                     <button
                       type="button"
                       disabled={loading || page <= 1}
-                      onClick={() => void loadItems(activeSourceId, activeType, page - 1)}
+                      onClick={() => fetchPage(page - 1)}
                       className="px-3 py-1.5 text-sm rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     >
                       上一页
@@ -298,7 +524,7 @@ export default function SourceBrowserPage() {
                           disabled={loading}
                           onClick={() => {
                             if (item === page) return;
-                            void loadItems(activeSourceId, activeType, item);
+                            fetchPage(item);
                           }}
                           aria-current={item === page ? 'page' : undefined}
                           className={`min-w-9 px-3 py-1.5 text-sm rounded-full border transition-all duration-200 cursor-pointer ${
@@ -315,7 +541,7 @@ export default function SourceBrowserPage() {
                     <button
                       type="button"
                       disabled={loading || page >= pagecount}
-                      onClick={() => void loadItems(activeSourceId, activeType, page + 1)}
+                      onClick={() => fetchPage(page + 1)}
                       className="px-3 py-1.5 text-sm rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     >
                       下一页
@@ -329,7 +555,7 @@ export default function SourceBrowserPage() {
                         const nextPage = Math.min(Math.max(target, 1), pagecount);
                         if (nextPage === page) return;
                         setJumpPage('');
-                        void loadItems(activeSourceId, activeType, nextPage);
+                        fetchPage(nextPage);
                       }}
                       className="flex items-center gap-1.5 ml-2"
                     >

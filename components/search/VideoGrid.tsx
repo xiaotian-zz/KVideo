@@ -76,8 +76,11 @@ export const VideoGrid = memo(function VideoGrid({
       // For grouped mode, will probe after grouping
       return [];
     }
-    return videos.map(v => ({ id: String(v.vod_id), source: v.source }));
-  }, [videos, displayMode]);
+    // 只探测当前可见的卡片，避免一次搜索对全部结果发起上千个详情请求
+    return videos
+      .slice(0, visibleCount)
+      .map(v => ({ id: String(v.vod_id), source: v.source }));
+  }, [videos, displayMode, visibleCount]);
 
   // Group videos by name when in grouped mode
   const groupedVideos = useMemo<GroupedVideo[]>(() => {
@@ -174,12 +177,15 @@ export const VideoGrid = memo(function VideoGrid({
   // Build probe list for grouped mode (probe representative of each group)
   const groupedProbeList = useMemo(() => {
     if (displayMode !== 'grouped') return [];
-    return groupedVideos.map(g => ({ id: String(g.representative.vod_id), source: g.representative.source }));
-  }, [groupedVideos, displayMode]);
+    return groupedVideos
+      .slice(0, visibleCount)
+      .map(g => ({ id: String(g.representative.vod_id), source: g.representative.source }));
+  }, [groupedVideos, displayMode, visibleCount]);
 
   // Probe resolutions
   const probeList = displayMode === 'grouped' ? groupedProbeList : videosToProbe;
-  const { resolutions, isProbing } = useResolutionProbe(probeList);
+  // 搜索页关闭分辨率探测，避免搜索后对大量结果额外请求详情和 m3u8
+  const { resolutions, isProbing } = useResolutionProbe(probeList, false);
 
   const totalItems = displayMode === 'grouped' ? groupItems.length : videoItems.length;
 

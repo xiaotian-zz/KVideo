@@ -21,7 +21,6 @@ import {
 } from '@/lib/server/auth-helpers';
 import {
   hasResolvedPermission,
-  normalizePermissions,
   normalizeRole,
   type Permission,
   type Role,

@@ -44,8 +44,6 @@ function createNodeStore(url: string): KeyValueStore {
   });
   const ready = client.connect();
 
-  let store: KeyValueStore;
-
   const dropCachedStore = () => {
     if (cachedStore === store) {
       cachedStore = undefined;
@@ -68,7 +66,7 @@ function createNodeStore(url: string): KeyValueStore {
     return withTimeout(operation(), 'Redis command timeout');
   };
 
-  store = {
+  const store: KeyValueStore = {
     async get<T = unknown>(key: string): Promise<T | null> {
       const raw = await run(() => client.get(key));
       if (raw === null) return null;

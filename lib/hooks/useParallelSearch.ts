@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { sortVideos } from '@/lib/utils/sort';
 import type { SortOption } from '@/lib/store/settings-store';
 import type { Video, SourceBadge, VideoSource } from '@/lib/types';
@@ -52,6 +52,13 @@ export function useParallelSearch(
   });
 
   const hasMore = currentPage < maxPageCount;
+
+  // 离开搜索页时中止仍在进行的搜索，避免服务端继续请求所有源
+  useEffect(() => {
+    return () => {
+      cancelSearch();
+    };
+  }, [cancelSearch]);
 
   /**
    * Reset search state

@@ -50,7 +50,10 @@ function getSourceConfigsForProbe(videos: VideoToProbe[]): VideoSource[] {
  * Hook that probes actual video resolutions via m3u8 manifests.
  * Returns a map of "source:id" -> ResolutionInfo.
  */
-export function useResolutionProbe(videos: VideoToProbe[]): {
+export function useResolutionProbe(
+  videos: VideoToProbe[],
+  enabled: boolean = true
+): {
   resolutions: Record<string, ResolutionInfo | null>;
   isProbing: boolean;
 } {
@@ -61,6 +64,7 @@ export function useResolutionProbe(videos: VideoToProbe[]): {
   const inFlightKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (!enabled) return;
     if (!videos || videos.length === 0) return;
 
     const inFlightKeys = inFlightKeysRef.current;
@@ -93,83 +97,88 @@ export function useResolutionProbe(videos: VideoToProbe[]): {
 
     if (needProbe.length === 0) return;
 
+    // 结果列表变化时立即取消上一批探测，避免旧批次继续占用服务器
     abortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
+    // 结果还在流式更新时先不发起探测，稳定后再探测，避免频繁重启批次
+    const timer = setTimeout(() => {
+      abortRef.current = controller;
 
-    (async () => {
-      setIsProbing(true);
-      try {
-        const sourceConfigs = getSourceConfigsForProbe(needProbe);
-        const response = await fetch('/api/probe-resolution', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videos: needProbe, sourceConfigs }),
-          signal: controller.signal,
-        });
+      (async () => {
+        setIsProbing(true);
+        try {
+          const sourceConfigs = getSourceConfigsForProbe(needProbe);
+          const response = await fetch('/api/probe-resolution', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videos: needProbe, sourceConfigs }),
+            signal: controller.signal,
+          });
 
-        if (!response.ok || !response.body) {
-          setIsProbing(false);
-          return;
-        }
+          if (!response.ok || !response.body) {
+            setIsProbing(false);
+            return;
+          }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
 
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            try {
-              const data = JSON.parse(line.slice(6)) as ResolutionProbeEvent;
-              if (data.done) continue;
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              try {
+                const data = JSON.parse(line.slice(6)) as ResolutionProbeEvent;
+                if (data.done) continue;
 
-              const resultKey = `${data.source}:${data.id}`;
-              const requestKey = `${data.source}:${data.id}:${data.episodeIndex ?? 0}`;
-              inFlightKeys.delete(requestKey);
-              completedKeys.add(requestKey);
+                const resultKey = `${data.source}:${data.id}`;
+                const requestKey = `${data.source}:${data.id}:${data.episodeIndex ?? 0}`;
+                inFlightKeys.delete(requestKey);
+                completedKeys.add(requestKey);
 
-              if (data.resolution) {
-                const resolution: ResolutionInfo = {
-                  ...data.resolution,
-                  origin: data.resolutionOrigin === 'hint' ? 'hint' : 'probed',
-                  episodeIndex: typeof data.episodeIndex === 'number' ? data.episodeIndex : undefined,
-                };
-                setCachedResolution(data.source, data.id, resolution);
-                setResolutions((previous) => ({ ...previous, [resultKey]: resolution }));
-              } else {
-                setResolutions((previous) => ({ ...previous, [resultKey]: null }));
+                if (data.resolution) {
+                  const resolution: ResolutionInfo = {
+                    ...data.resolution,
+                    origin: data.resolutionOrigin === 'hint' ? 'hint' : 'probed',
+                    episodeIndex: typeof data.episodeIndex === 'number' ? data.episodeIndex : undefined,
+                  };
+                  setCachedResolution(data.source, data.id, resolution);
+                  setResolutions((previous) => ({ ...previous, [resultKey]: resolution }));
+                } else {
+                  setResolutions((previous) => ({ ...previous, [resultKey]: null }));
+                }
+              } catch {
+                // Ignore malformed SSE chunks and continue reading.
               }
-            } catch {
-              // Ignore malformed SSE chunks and continue reading.
             }
           }
+        } catch (error: unknown) {
+          if (!(error instanceof DOMException && error.name === 'AbortError')) {
+            console.warn('[ResolutionProbe] Failed:', error);
+          }
+        } finally {
+          for (const requestKey of batchRequestKeys) {
+            inFlightKeys.delete(requestKey);
+          }
+          setIsProbing(false);
         }
-      } catch (error: unknown) {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          console.warn('[ResolutionProbe] Failed:', error);
-        }
-      } finally {
-        for (const requestKey of batchRequestKeys) {
-          inFlightKeys.delete(requestKey);
-        }
-        setIsProbing(false);
-      }
-    })();
+      })();
+    }, 600);
 
     return () => {
+      clearTimeout(timer);
       controller.abort();
       for (const requestKey of batchRequestKeys) {
         inFlightKeys.delete(requestKey);
       }
     };
-  }, [videos]);
+  }, [videos, enabled]);
 
   return { resolutions, isProbing };
 }

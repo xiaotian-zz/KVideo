@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
-import { MainNav } from '@/components/layout/MainNav';
+import { MainNav, MobileBottomNav } from '@/components/layout/MainNav';
 import { Icons } from '@/components/ui/Icon';
 import { siteConfig } from '@/lib/config/site-config';
 import { getSession, clearSession, type AuthSession } from '@/lib/store/auth-store';
@@ -70,12 +70,13 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
     };
 
     return (
-        <nav className="sticky top-0 z-[2000] pt-4 pb-2" style={{
+        <>
+        <nav className="sticky top-0 z-[2000] pt-0 pb-2 sm:pt-4" style={{
             transform: 'translate3d(0, 0, 0)',
             willChange: 'transform'
         }}>
-            <div className="max-w-7xl mx-auto px-4">
-                <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-[var(--shadow-sm)] px-3 sm:px-6 py-2 sm:py-4 rounded-[var(--radius-2xl)]" style={{
+            <div className="max-w-7xl mx-auto px-0 sm:px-4">
+                <div className="bg-[var(--glass-bg)] border border-x-0 sm:border-x border-[var(--glass-border)] shadow-[var(--shadow-sm)] px-3 sm:px-6 py-2 sm:py-4 rounded-none sm:rounded-[var(--radius-2xl)]" style={{
                     transform: 'translate3d(0, 0, 0)'
                 }}>
                     <div className="flex items-center justify-between gap-2 sm:gap-4">
@@ -171,12 +172,14 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
                         </div>
                     </div>
                     {!isPremiumMode && (
-                        <div className="xl:hidden mt-2">
+                        <div className="hidden md:block xl:hidden mt-2">
                             <MainNav inline />
                         </div>
                     )}
                 </div>
             </div>
         </nav>
+        {!isPremiumMode && <MobileBottomNav />}
+        </>
     );
 }

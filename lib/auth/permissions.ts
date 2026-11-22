@@ -110,11 +110,7 @@ export function resolvePermissions(role: Role): Permission[] {
   return ROLE_PERMISSIONS[normalizeRole(role)];
 }
 
-export function hasResolvedPermission(
-  role: Role,
-  permission: Permission,
-  _customPermissions?: readonly string[] | null
-): boolean {
+export function hasResolvedPermission(role: Role, permission: Permission): boolean {
   return resolvePermissions(role).includes(permission);
 }
 

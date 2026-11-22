@@ -52,9 +52,10 @@ function buildSourceConfigMap(rawConfigs: unknown): Map<string, VideoSource> {
   return configs;
 }
 
-async function fetchManifestText(url: string, timeoutMs: number): Promise<string> {
+async function fetchManifestText(url: string, timeoutMs: number, signal?: AbortSignal): Promise<string> {
   const response = await fetchWithTimeout(url, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal,
   }, timeoutMs);
   return response.text();
 }
@@ -62,7 +63,8 @@ async function fetchManifestText(url: string, timeoutMs: number): Promise<string
 async function probeManifestResolution(
   targetUrl: string,
   m3u8Content: string,
-  detailHint: ResolutionProbeLabel | null
+  detailHint: ResolutionProbeLabel | null,
+  signal?: AbortSignal
 ): Promise<{ resolution: ResolutionProbeLabel | null; origin: 'manifest' | 'hint' }> {
   const directResolution = parseResolutionFromManifest(m3u8Content, targetUrl);
   if (directResolution) {
@@ -77,7 +79,7 @@ async function probeManifestResolution(
     }
 
     try {
-      const variantContent = await fetchManifestText(variantUrl, 6000);
+      const variantContent = await fetchManifestText(variantUrl, 6000, signal);
       const variantResolution = parseResolutionFromManifest(variantContent, variantUrl);
       if (variantResolution) {
         return { resolution: variantResolution, origin: 'manifest' };
@@ -94,7 +96,7 @@ async function probeManifestResolution(
   };
 }
 
-async function probeOne(video: ProbeRequest, providedConfigs: Map<string, VideoSource>): Promise<{
+async function probeOne(video: ProbeRequest, providedConfigs: Map<string, VideoSource>, signal?: AbortSignal): Promise<{
   id: string | number;
   source: string;
   episodeIndex?: number;
@@ -108,7 +110,8 @@ async function probeOne(video: ProbeRequest, providedConfigs: Map<string, VideoS
     }
 
     // 1. Get detail to find first episode URL
-    const detail = await getVideoDetail(video.id, sourceConfig);
+    // 分辨率探测只是一次性补充信息，失败直接跳过，不做重试
+    const detail = await getVideoDetail(video.id, sourceConfig, signal, 0);
     if (!detail.episodes || detail.episodes.length === 0) {
       return { id: video.id, source: video.source, episodeIndex: video.episodeIndex, resolution: null, resolutionOrigin: 'manifest' };
     }
@@ -126,7 +129,7 @@ async function probeOne(video: ProbeRequest, providedConfigs: Map<string, VideoS
     // 2. Fetch the m3u8 manifest
     let m3u8Content: string;
     try {
-      m3u8Content = await fetchManifestText(targetUrl, 8000);
+      m3u8Content = await fetchManifestText(targetUrl, 8000, signal);
     } catch {
       return {
         id: video.id,
@@ -137,7 +140,7 @@ async function probeOne(video: ProbeRequest, providedConfigs: Map<string, VideoS
       };
     }
 
-    const probed = await probeManifestResolution(targetUrl, m3u8Content, detailHint);
+    const probed = await probeManifestResolution(targetUrl, m3u8Content, detailHint, signal);
     return { id: video.id, source: video.source, episodeIndex, resolution: probed.resolution, resolutionOrigin: probed.origin };
   } catch {
     return {
@@ -174,9 +177,11 @@ export async function POST(request: NextRequest) {
 
         async function processNext(): Promise<void> {
           while (index < batch.length) {
+            // 客户端已取消（如搜索结果刷新）时立即停止，避免继续占用服务器
+            if (request.signal.aborted) return;
             const current = batch[index++];
             try {
-              const result = await probeOne(current, sourceConfigs);
+              const result = await probeOne(current, sourceConfigs, request.signal);
               const line = `data: ${JSON.stringify(result)}\n\n`;
               controller.enqueue(encoder.encode(line));
             } catch {

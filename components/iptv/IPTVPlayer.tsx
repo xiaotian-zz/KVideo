@@ -115,12 +115,15 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
   );
 
   // Get current route URL
-  const routes = channel.routes || [channel.url];
+  const routes = useMemo(() => channel.routes || [channel.url], [channel.routes, channel.url]);
   const currentUrl = routes[currentRouteIndex] || channel.url;
   const routesRef = useRef(routes);
   const routeIndexRef = useRef(currentRouteIndex);
-  routesRef.current = routes;
-  routeIndexRef.current = currentRouteIndex;
+
+  useEffect(() => {
+    routesRef.current = routes;
+    routeIndexRef.current = currentRouteIndex;
+  }, [routes, currentRouteIndex]);
 
   // Route display - collapse if > MAX_VISIBLE_ROUTES
   const visibleRoutes = showAllRoutes ? routes : routes.slice(0, MAX_VISIBLE_ROUTES);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Clover, Film, PlaySquare, Tv } from 'lucide-react';
 import { Icons } from '@/components/ui/Icon';
 
 interface FeaturedMovie {
@@ -21,11 +22,11 @@ interface FeaturedData {
 
 type SectionKey = keyof FeaturedData;
 
-const SECTIONS: Array<{ key: SectionKey; title: string }> = [
-  { key: 'hotMovies', title: '热门电影' },
-  { key: 'hotTvShows', title: '热门剧集' },
-  { key: 'hotVarietyShows', title: '热门综艺' },
-  { key: 'hotShortDramas', title: '热门短剧' },
+const SECTIONS: Array<{ key: SectionKey; title: string; icon: typeof Film; color: string }> = [
+  { key: 'hotMovies', title: '热门电影', icon: Film, color: 'text-red-500' },
+  { key: 'hotTvShows', title: '热门剧集', icon: Tv, color: 'text-blue-500' },
+  { key: 'hotVarietyShows', title: '热门综艺', icon: Clover, color: 'text-orange-500' },
+  { key: 'hotShortDramas', title: '热门短剧', icon: PlaySquare, color: 'text-purple-500' },
 ];
 
 function FeaturedCard({
@@ -43,10 +44,10 @@ function FeaturedCard({
     <button
       type="button"
       onClick={() => onSelect(movie.title)}
-      className="group w-36 sm:w-40 shrink-0 snap-start text-left cursor-pointer"
+      className="group w-24 sm:w-44 shrink-0 snap-start text-left cursor-pointer"
       title={movie.title}
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-sm group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.03]">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-lg sm:rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-sm group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.03]">
         {movie.cover && !imageError ? (
           // 短剧封面可能来自任意 CMS 域名，使用原生 img 避免图片域名限制
           <img
@@ -88,7 +89,7 @@ function FeaturedCard({
         )}
       </div>
 
-      <h3 className="mt-2 text-sm font-semibold text-[var(--text-color)] line-clamp-2 group-hover:text-[var(--accent-color)] transition-colors">
+      <h3 className="mt-1.5 sm:mt-2 text-xs sm:text-sm font-semibold text-[var(--text-color)] line-clamp-2 group-hover:text-[var(--accent-color)] transition-colors">
         {movie.title}
       </h3>
     </button>

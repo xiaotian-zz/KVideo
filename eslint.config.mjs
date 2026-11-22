@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
       "react/prop-types": "off",
     },
   },
+  {
+    // 视频源海报域名不固定，使用原生 img 避免 next/image 远程域名配置限制
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

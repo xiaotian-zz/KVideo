@@ -34,7 +34,7 @@ async function logoutAndReload() {
     await fetch('/api/auth/session', { method: 'DELETE' });
   } finally {
     clearSession();
-    window.location.href = '/';
+    window.location.replace('/');
   }
 }
 
@@ -44,7 +44,7 @@ function formatDate(timestamp: number): string {
 }
 
 export function AccountSettings() {
-  const [session, setSession] = useState<ReturnType<typeof getSession>>(null);
+  const [session] = useState<ReturnType<typeof getSession>>(() => getSession());
   const [accounts, setAccounts] = useState<AccountInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -57,10 +57,6 @@ export function AccountSettings() {
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setSession(getSession());
-  }, []);
-
   const loadAccounts = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -71,14 +67,16 @@ export function AccountSettings() {
         throw new Error(data?.error || '加载账户失败');
       }
       setAccounts(Array.isArray(data.accounts) ? data.accounts : []);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '加载账户失败');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '加载账户失败');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // 首次进入设置页加载账户列表，属于标准的数据拉取副作用
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadAccounts();
   }, [loadAccounts]);
 

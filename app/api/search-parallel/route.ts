@@ -14,8 +14,13 @@ import { traditionalToSimplified } from '@/lib/utils/chinese-convert';
 export const runtime = 'edge';
 
 const MAX_TOTAL_VIDEOS = 2000;
-const MAX_PAGES_PER_SOURCE = 3;
+// 只搜每个源的第一页：76 个源的第一页已经足够，避免翻页把请求量放大数倍
+const MAX_PAGES_PER_SOURCE = 1;
 const PER_SOURCE_TIMEOUT_MS = 20000;
+// 全局限速：一次只同时搜索这么多源，避免瞬间打出几十上百个请求
+const SOURCE_BATCH_SIZE = 10;
+// 单次搜索的最长耗时，超时后立即收尾，防止慢源长期占用服务器
+const SEARCH_DEADLINE_MS = 25000;
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
@@ -60,8 +65,19 @@ export async function POST(request: NextRequest) {
         let completedSources = 0;
         let totalVideosFound = 0;
 
-        const searchPromises = sources.map(async (source) => {
-          if (signal.aborted) return;
+        // 整体搜索截止时间：到点后中止所有仍在进行的源请求
+        const deadlineController = new AbortController();
+        const deadlineTimer = setTimeout(
+          () => deadlineController.abort(),
+          SEARCH_DEADLINE_MS
+        );
+        const stopSignal = deadlineController.signal;
+        const onRequestAbort = () => deadlineController.abort();
+        signal.addEventListener('abort', onRequestAbort, { once: true });
+        const isStopped = () => signal.aborted || stopSignal.aborted;
+
+        const searchSource = async (source: VideoSource) => {
+          if (isStopped()) return;
 
           const startTime = performance.now();
 
@@ -72,9 +88,10 @@ export async function POST(request: NextRequest) {
             PER_SOURCE_TIMEOUT_MS
           );
 
-          // Cascade request abort to source controller
-          const onRequestAbort = () => sourceController.abort();
-          signal.addEventListener('abort', onRequestAbort, { once: true });
+          // Cascade request abort / deadline to source controller
+          const onStop = () => sourceController.abort();
+          signal.addEventListener('abort', onStop, { once: true });
+          stopSignal.addEventListener('abort', onStop, { once: true });
 
           try {
             const result = await searchVideos(
@@ -88,7 +105,7 @@ export async function POST(request: NextRequest) {
             completedSources++;
             totalVideosFound += videos.length;
 
-            if (videos.length > 0 && !signal.aborted) {
+            if (videos.length > 0 && !isStopped()) {
               safeSend({
                 type: 'videos',
                 videos: videos.map((video) => ({
@@ -111,14 +128,14 @@ export async function POST(request: NextRequest) {
             });
 
             // Auto-fetch remaining pages (capped)
-            if (pagecount > 1 && totalVideosFound < MAX_TOTAL_VIDEOS && !signal.aborted) {
+            if (pagecount > 1 && totalVideosFound < MAX_TOTAL_VIDEOS && !isStopped()) {
               const maxPages = Math.min(pagecount, MAX_PAGES_PER_SOURCE);
               const remainingPages = Array.from(
                 { length: maxPages - 1 }, (_, i) => i + 2
               );
 
               for (const pg of remainingPages) {
-                if (signal.aborted || totalVideosFound >= MAX_TOTAL_VIDEOS) break;
+                if (isStopped() || totalVideosFound >= MAX_TOTAL_VIDEOS) break;
 
                 try {
                   const pageResult = await searchVideos(
@@ -127,7 +144,7 @@ export async function POST(request: NextRequest) {
                   const pageVideos = pageResult[0]?.results || [];
                   totalVideosFound += pageVideos.length;
 
-                  if (pageVideos.length > 0 && !signal.aborted) {
+                  if (pageVideos.length > 0 && !isStopped()) {
                     safeSend({
                       type: 'videos',
                       videos: pageVideos.map((video) => ({
@@ -170,11 +187,31 @@ export async function POST(request: NextRequest) {
             });
           } finally {
             clearTimeout(sourceTimeout);
-            signal.removeEventListener('abort', onRequestAbort);
+            signal.removeEventListener('abort', onStop);
+            stopSignal.removeEventListener('abort', onStop);
           }
-        });
+        };
 
-        await Promise.all(searchPromises);
+        try {
+          // 固定并发数的工作池：最多同时搜索 SOURCE_BATCH_SIZE 个源
+          let nextIndex = 0;
+          const worker = async () => {
+            while (!isStopped()) {
+              const index = nextIndex++;
+              if (index >= sources.length) return;
+              await searchSource(sources[index]);
+            }
+          };
+          await Promise.all(
+            Array.from(
+              { length: Math.min(SOURCE_BATCH_SIZE, sources.length) },
+              () => worker()
+            )
+          );
+        } finally {
+          clearTimeout(deadlineTimer);
+          signal.removeEventListener('abort', onRequestAbort);
+        }
 
         if (!signal.aborted) {
           safeSend({

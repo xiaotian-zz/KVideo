@@ -60,6 +60,9 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
     setImageUrl(null);
     setLoading(false);
 
+    const queued = queuedRef.current;
+    const frames = framesRef.current;
+
     return () => {
       destroyedRef.current = true;
       if (debounceRef.current !== null) {
@@ -85,8 +88,8 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
       readyRef.current = false;
       generatingRef.current = false;
       queueRef.current = [];
-      queuedRef.current.clear();
-      framesRef.current.clear();
+      queued.clear();
+      frames.clear();
     };
   }, [duration, src]);
 
@@ -141,6 +144,7 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
         canvas = document.createElement('canvas');
         canvasRef.current = canvas;
       }
+      // canvas 是本地创建的离屏节点，尺寸更新不会影响 React 渲染
       canvas.width = width;
       canvas.height = height;
 
@@ -163,7 +167,7 @@ export function useThumbnailPreview(src: string, duration: number): ThumbnailPre
     }
   }, []);
 
-  const processQueue = useCallback(() => {
+  const processQueue = useCallback(function processQueue() {
     if (destroyedRef.current || unavailableRef.current || generatingRef.current) return;
 
     const video = videoRef.current;

@@ -93,9 +93,12 @@ function DoubanCategoryContent() {
 
   // 切换分类时重置所有标签（与 LunaTV 一致）
   useEffect(() => {
+    // 分类变化后需要同步派生筛选状态
+    /* eslint-disable react-hooks/set-state-in-effect */
     setPrimarySelection(getInitialPrimary(type));
     setSecondarySelection(getInitialSecondary(type));
     setMultiLevelValues(getEmptyMultiValues());
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [type]);
 
   const buildListPath = useCallback(
@@ -223,6 +226,8 @@ function DoubanCategoryContent() {
   );
 
   useEffect(() => {
+    // 首次进入或筛选条件变化时拉取列表
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMovies(0);
   }, [loadMovies]);
 
@@ -302,7 +307,7 @@ function DoubanCategoryContent() {
         {selectors}
 
         {loading && movies.length === 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
             {Array.from({ length: 10 }).map((_, index) => (
               <div
                 key={index}
@@ -316,7 +321,7 @@ function DoubanCategoryContent() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
               {movies.map((movie) => (
                 <MovieCard key={movie.id} movie={movie} onMovieClick={handleMovieClick} />
               ))}

@@ -42,6 +42,8 @@ export default function ShortDramaPage() {
   }, []);
 
   useEffect(() => {
+    // 首次进入短剧页拉取列表
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load('', 1);
   }, [load]);
 
@@ -73,7 +75,7 @@ export default function ShortDramaPage() {
         )}
 
         {loading && items.length === 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
             {Array.from({ length: 10 }).map((_, index) => (
               <div
                 key={index}
@@ -87,7 +89,7 @@ export default function ShortDramaPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
               {items.map((item) => (
                 <MovieCard
                   key={item.id}

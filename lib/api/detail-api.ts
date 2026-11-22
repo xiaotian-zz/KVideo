@@ -11,7 +11,9 @@ import { parseEpisodes } from './parsers';
  */
 export async function getVideoDetail(
     id: string | number,
-    source: VideoSource
+    source: VideoSource,
+    signal?: AbortSignal,
+    retries: number = 3
 ): Promise<VideoDetail> {
     const url = new URL(`${source.baseUrl}${source.detailPath}`);
     url.searchParams.set('ac', 'detail');
@@ -25,6 +27,7 @@ export async function getVideoDetail(
                     'User-Agent': 'Mozilla/5.0',
                     ...source.headers,
                 },
+                signal,
             });
 
             if (!res.ok) {
@@ -32,7 +35,7 @@ export async function getVideoDetail(
             }
 
             return res;
-        });
+        }, retries);
 
         const data: ApiDetailResponse = await response.json();
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Lock } from 'lucide-react';
 import { canRoleAccessSourceKind, sourceAccessStore } from '@/lib/store/source-access-store';
 
@@ -108,12 +109,12 @@ export function PremiumPasswordGate({ children }: { children: React.ReactNode })
                                 当前用户组没有查看 18+ 源的权限，请联系管理员调整用户组设置。
                             </p>
                         </div>
-                        <a
+                        <Link
                             href="/"
                             className="px-4 py-2 rounded-[var(--radius-2xl)] bg-[var(--accent-color)] text-white text-sm font-semibold hover:brightness-110 transition-all duration-200"
                         >
                             返回首页
-                        </a>
+                        </Link>
                     </div>
                 </div>
             </div>

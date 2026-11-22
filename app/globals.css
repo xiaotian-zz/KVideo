@@ -27,3 +27,10 @@
 .no-spinner {
   -moz-appearance: textfield;
 }
+
+/* 手机端为底部导航预留空间，避免分页等内容被遮挡 */
+@media (max-width: 767px) {
+  body {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
