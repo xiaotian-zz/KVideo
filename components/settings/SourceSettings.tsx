@@ -25,7 +25,9 @@ export function SourceSettings({
     const [showAllSources, setShowAllSources] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const filteredSources = sources.filter(source =>
+    const allSources = [...sources, ...premiumSources];
+
+    const filteredSources = allSources.filter(source =>
         source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         source.baseUrl.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -34,59 +36,44 @@ export function SourceSettings({
         ? filteredSources
         : filteredSources.slice(0, 10);
 
+    const isPremiumSource = (id: string) => premiumSources.some(s => s.id === id);
+
     const handleToggle = (id: string) => {
-        const updated = sources.map(s =>
-            s.id === id ? { ...s, enabled: !s.enabled } : s
+        if (isPremiumSource(id)) {
+            onPremiumSourcesChange(
+                premiumSources.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)
+            );
+            return;
+        }
+        onSourcesChange(
+            sources.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)
         );
-        onSourcesChange(updated);
     };
 
     const handleDelete = (id: string) => {
-        const updated = sources.filter(s => s.id !== id);
-        onSourcesChange(updated);
+        if (isPremiumSource(id)) {
+            onPremiumSourcesChange(premiumSources.filter(s => s.id !== id));
+            return;
+        }
+        onSourcesChange(sources.filter(s => s.id !== id));
     };
 
     const handleReorder = (id: string, direction: 'up' | 'down') => {
-        const currentIndex = sources.findIndex(s => s.id === id);
+        const premium = isPremiumSource(id);
+        const list = premium ? premiumSources : sources;
+        const currentIndex = list.findIndex(s => s.id === id);
         if (currentIndex === -1) return;
 
         const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-        if (newIndex < 0 || newIndex >= sources.length) return;
+        if (newIndex < 0 || newIndex >= list.length) return;
 
-        const updated = [...sources];
+        const updated = [...list];
         [updated[currentIndex], updated[newIndex]] = [updated[newIndex], updated[currentIndex]];
 
         // Update priorities
         updated.forEach((s, idx) => s.priority = idx + 1);
-        onSourcesChange(updated);
-    };
-
-    const filteredPremiumSources = premiumSources.filter(source =>
-        source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        source.baseUrl.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const handlePremiumToggle = (id: string) => {
-        onPremiumSourcesChange(
-            premiumSources.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)
-        );
-    };
-
-    const handlePremiumDelete = (id: string) => {
-        onPremiumSourcesChange(premiumSources.filter(s => s.id !== id));
-    };
-
-    const handlePremiumReorder = (id: string, direction: 'up' | 'down') => {
-        const currentIndex = premiumSources.findIndex(s => s.id === id);
-        if (currentIndex === -1) return;
-
-        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-        if (newIndex < 0 || newIndex >= premiumSources.length) return;
-
-        const updated = [...premiumSources];
-        [updated[currentIndex], updated[newIndex]] = [updated[newIndex], updated[currentIndex]];
-        updated.forEach((s, idx) => s.priority = idx + 1);
-        onPremiumSourcesChange(updated);
+        if (premium) onPremiumSourcesChange(updated);
+        else onSourcesChange(updated);
     };
 
     return (
@@ -139,42 +126,14 @@ export function SourceSettings({
                 onEdit={onEditSource}
                 defaultIds={DEFAULT_SOURCES.map(s => s.id)}
             />
-            {!searchQuery && sources.length > 10 && (
+            {!searchQuery && allSources.length > 10 && (
                 <button
                     onClick={() => setShowAllSources(!showAllSources)}
                     className="w-full mt-4 px-4 py-3 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] text-sm font-medium hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
                 >
-                    {showAllSources ? '收起' : `显示全部 (${sources.length})`}
+                    {showAllSources ? '收起' : `显示全部 (${allSources.length})`}
                 </button>
             )}
-
-            <div className="mt-8 pt-6 border-t border-[var(--glass-border)]">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="text-base font-semibold text-[var(--text-color)]">18+ 源</h3>
-                    <span className="px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
-                        18+
-                    </span>
-                </div>
-                <p className="text-sm text-[var(--text-color-secondary)] mb-4">
-                    共 {premiumSources.length} 个，与普通源一起在本页管理
-                </p>
-
-                {filteredPremiumSources.length === 0 ? (
-                    <div className="px-4 py-6 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--text-color-secondary)] text-center">
-                        {searchQuery ? '没有匹配的 18+ 源' : '暂无 18+ 源，可在添加源时选择「18+ 源」'}
-                    </div>
-                ) : (
-                    <SourceManager
-                        sources={filteredPremiumSources}
-                        onToggle={handlePremiumToggle}
-                        onDelete={handlePremiumDelete}
-                        onReorder={handlePremiumReorder}
-                        onEdit={onEditSource}
-                        defaultIds={[]}
-                        premium
-                    />
-                )}
-            </div>
         </div>
     );
 }
