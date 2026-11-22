@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readGlobalConfig } from '@/lib/server/global-config';
 import { getRedisClient } from '@/lib/server/redis';
+import { getServerSession } from '@/lib/server/auth';
+import { DEFAULT_ROLE_SOURCE_ACCESS, normalizeRole } from '@/lib/auth/permissions';
 
 export const runtime = 'nodejs';
 
@@ -35,7 +37,15 @@ export async function GET(request: NextRequest) {
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
 
   const config = await readGlobalConfig();
-  const source = config?.sources.find((item) => item.id === sourceId && item.enabled);
+  const session = await getServerSession(request);
+  const role = normalizeRole(session?.role);
+  const roleSourceAccess = config?.roleSourceAccess ?? DEFAULT_ROLE_SOURCE_ACCESS;
+  const canViewPremium = roleSourceAccess[role].includes('premium');
+
+  const source = config?.sources.find((item) => item.id === sourceId && item.enabled)
+    || (canViewPremium
+      ? config?.premiumSources.find((item) => item.id === sourceId && item.enabled)
+      : undefined);
 
   if (!source) {
     return NextResponse.json({ error: 'Source not found' }, { status: 404 });
@@ -106,7 +116,7 @@ export async function GET(request: NextRequest) {
       .map((item) => ({
         id: String(item.vod_id ?? item.vod_name),
         title: String(item.vod_name),
-        cover: String(item.vod_pic || '').replace(/^http:\/\//i, 'https://'),
+        cover: String(item.vod_pic || ''),
         remarks: item.vod_remarks ? String(item.vod_remarks) : '',
         typeName: item.type_name ? String(item.type_name) : '',
       }));

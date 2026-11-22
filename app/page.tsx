@@ -6,7 +6,6 @@ import { NoResults } from '@/components/search/NoResults';
 import { PopularFeatures } from '@/components/home/PopularFeatures';
 import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
 import { Navbar } from '@/components/layout/Navbar';
-import { MainNav } from '@/components/layout/MainNav';
 import { SearchResults } from '@/components/home/SearchResults';
 import { useHomePage } from '@/lib/hooks/useHomePage';
 import { useLatencyPing } from '@/lib/hooks/useLatencyPing';
@@ -42,7 +41,6 @@ function HomePage() {
     <div className="min-h-screen">
       {/* Glass Navbar */}
       <Navbar onReset={handleReset} />
-      <MainNav />
 
       {/* Search Form - Separate from navbar */}
       <div className="max-w-7xl mx-auto px-4 mt-6 mb-8 relative" style={{

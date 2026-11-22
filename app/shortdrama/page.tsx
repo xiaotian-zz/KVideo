@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
-import { MainNav } from '@/components/layout/MainNav';
 import { CategoryPills } from '@/components/ui/CategoryPills';
 import { MovieCard } from '@/components/home/MovieCard';
 import type { ShortDramaCategory, ShortDramaItem } from '@/lib/types/shortdrama';
@@ -61,7 +60,6 @@ export default function ShortDramaPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
       <Navbar onReset={() => router.push('/')} />
-      <MainNav />
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-5">
         <h1 className="text-2xl font-bold text-[var(--text-color)]">短剧</h1>

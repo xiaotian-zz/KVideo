@@ -1,15 +1,25 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { settingsStore } from '@/lib/store/settings-store';
+import { sourceAccessStore } from '@/lib/store/source-access-store';
+import { siteSettingsStore } from '@/lib/store/site-settings-store';
+import { useIPTVStore } from '@/lib/store/iptv-store';
 import { getSession } from '@/lib/store/auth-store';
-import { pushGlobalConfig } from '@/lib/utils/global-config-client';
+import {
+  pushGlobalConfig,
+  subscribeGlobalConfigUpdates,
+} from '@/lib/utils/global-config-client';
 
 /**
  * 应用启动时加载管理员维护的全局视频源。
  * 所有用户（包括未登录）都使用同一份源配置。
  */
 export function GlobalConfigSync() {
+  const pathname = usePathname();
+  const isSettingsEditor = pathname === '/settings' || pathname === '/premium/settings';
+
   useEffect(() => {
     let cancelled = false;
 
@@ -35,17 +45,50 @@ export function GlobalConfigSync() {
         const remotePremiumSources = Array.isArray(data.premiumSources) ? data.premiumSources : [];
         const remoteSubscriptions = Array.isArray(data.subscriptions) ? data.subscriptions : [];
 
-        settingsStore.saveSettings({
-          ...current,
-          // 远程为空时保留本地数据，避免首次加载把已有源清空
-          sources: remoteSources.length > 0 ? remoteSources : current.sources,
-          premiumSources: remotePremiumSources.length > 0
-            ? remotePremiumSources
-            : current.premiumSources,
-          subscriptions: remoteSubscriptions.length > 0
-            ? remoteSubscriptions
-            : current.subscriptions,
-        });
+        // 用户组可查看的源类型由管理员维护，所有客户端共用
+        if (data.roleSourceAccess) {
+          sourceAccessStore.set(data.roleSourceAccess);
+        }
+
+        // 网站标题由管理员在后台设置
+        const nextSiteTitle = typeof data.siteTitle === 'string' ? data.siteTitle : '';
+        if (siteSettingsStore.getTitle() !== nextSiteTitle) {
+          siteSettingsStore.setTitle(nextSiteTitle);
+        }
+
+        // 直播源改为全局配置，所有用户使用同一份，不再同步个人源
+        const remoteIptvSources = Array.isArray(data.iptvSources) ? data.iptvSources : [];
+        if (JSON.stringify(useIPTVStore.getState().sources) !== JSON.stringify(remoteIptvSources)) {
+          useIPTVStore.setState({
+            sources: remoteIptvSources,
+            cachedChannels: [],
+            cachedGroups: [],
+            cachedChannelsBySource: {},
+            lastRefreshed: 0,
+          });
+        }
+
+        const nextSources = remoteSources.length > 0 ? remoteSources : current.sources;
+        const nextPremiumSources = remotePremiumSources.length > 0
+          ? remotePremiumSources
+          : current.premiumSources;
+        const nextSubscriptions = remoteSubscriptions.length > 0
+          ? remoteSubscriptions
+          : current.subscriptions;
+
+        const changed =
+          JSON.stringify(current.sources) !== JSON.stringify(nextSources)
+          || JSON.stringify(current.premiumSources) !== JSON.stringify(nextPremiumSources)
+          || JSON.stringify(current.subscriptions) !== JSON.stringify(nextSubscriptions);
+
+        if (changed) {
+          settingsStore.saveSettings({
+            ...current,
+            sources: nextSources,
+            premiumSources: nextPremiumSources,
+            subscriptions: nextSubscriptions,
+          });
+        }
 
         // 管理员首次使用：把本地已有源写入全局配置
         if (
@@ -62,10 +105,32 @@ export function GlobalConfigSync() {
 
     void load();
 
+    // 设置页是配置的编辑方，不响应远程刷新，避免拖动过程中被旧快照覆盖
+    if (isSettingsEditor) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const unsubscribe = subscribeGlobalConfigUpdates(() => {
+      void load();
+    });
+    const handleFocus = () => {
+      void load();
+    };
+    window.addEventListener('focus', handleFocus);
+    // 其他设备/浏览器没有 BroadcastChannel 通知，用轮询兜底
+    const timer = window.setInterval(() => {
+      void load();
+    }, 15000);
+
     return () => {
       cancelled = true;
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+      window.clearInterval(timer);
     };
-  }, []);
+  }, [isSettingsEditor]);
 
   return null;
 }

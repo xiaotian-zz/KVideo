@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
-import { MainNav } from '@/components/layout/MainNav';
 import { FavoritesPageHeader } from '@/components/favorites/FavoritesPageHeader';
 import { FavoritesGrid } from '@/components/favorites/FavoritesGrid';
 import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
@@ -43,7 +42,6 @@ export function FavoritesPageContent({
         onReset={() => router.push(isPremium ? '/premium' : '/')}
         isPremiumMode={isPremium}
       />
-      {!isPremium && <MainNav />}
 
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
         <FavoritesPageHeader

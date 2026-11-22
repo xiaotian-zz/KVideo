@@ -8,34 +8,6 @@ import { clearSession, getSession, setSession, type AuthSession } from '@/lib/st
 import { resolvePasswordGateState } from '@/lib/auth/password-gate-state';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
 import { hasStoredAppSetting, settingsStore } from '@/lib/store/settings-store';
-import { useIPTVStore } from '@/lib/store/iptv-store';
-
-function syncIPTVSources(rawValue: string) {
-  const iptvStore = useIPTVStore.getState();
-
-  let entries: { name: string; url: string }[] = [];
-
-  try {
-    const parsed = JSON.parse(rawValue);
-    if (Array.isArray(parsed)) {
-      entries = parsed.filter((item: unknown): item is { name: string; url: string } => {
-        if (!item || typeof item !== 'object') return false;
-        const candidate = item as { name?: unknown; url?: unknown };
-        return typeof candidate.url === 'string';
-      });
-    }
-  } catch {
-    if (rawValue.includes('http')) {
-      const urls = rawValue.split(',').map((value) => value.trim()).filter((value) => value.startsWith('http'));
-      entries = urls.map((url, index) => ({
-        name: urls.length > 1 ? `直播源 ${index + 1}` : '直播源',
-        url,
-      }));
-    }
-  }
-
-  iptvStore.syncBuiltinSources(entries);
-}
 
 function syncMergeSources(rawValue: string) {
   const enabled = rawValue === 'true' || rawValue === '1';
@@ -64,16 +36,11 @@ function syncDanmakuApiUrl(rawValue: string) {
 
 function applyRuntimeConfig(data: {
   subscriptionSources?: string;
-  iptvSources?: string;
   mergeSources?: string;
   danmakuApiUrl?: string;
 }) {
   if (data.subscriptionSources) {
     settingsStore.syncEnvSubscriptions(data.subscriptionSources);
-  }
-
-  if (data.iptvSources) {
-    syncIPTVSources(data.iptvSources);
   }
 
   if (data.mergeSources) {

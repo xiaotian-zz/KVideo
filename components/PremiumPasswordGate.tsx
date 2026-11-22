@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
+import { canRoleAccessSourceKind, sourceAccessStore } from '@/lib/store/source-access-store';
 
 const PREMIUM_UNLOCK_KEY = 'kvideo-premium-unlocked';
 
 export function PremiumPasswordGate({ children }: { children: React.ReactNode }) {
     const [isLocked, setIsLocked] = useState(true);
+    const [denied, setDenied] = useState(false);
     const [password, setPassword] = useState('');
     const [error, setError] = useState(false);
     const [isClient, setIsClient] = useState(false);
@@ -20,19 +22,33 @@ export function PremiumPasswordGate({ children }: { children: React.ReactNode })
             const unlocked = sessionStorage.getItem(PREMIUM_UNLOCK_KEY) === 'true';
 
             try {
-                const [configRes, sessionRes] = await Promise.all([
+                const [configRes, sessionRes, globalRes] = await Promise.all([
                     fetch('/api/auth'),
                     fetch('/api/auth/session'),
+                    fetch('/api/global-config', { cache: 'no-store' }),
                 ]);
                 if (!configRes.ok) throw new Error('Failed to fetch auth config');
                 const data = await configRes.json();
                 const sessionData = sessionRes.ok ? await sessionRes.json() : null;
-                const privilegedSession = !!sessionData?.session &&
-                    (sessionData.session.role === 'admin' || sessionData.session.role === 'premium');
+                const globalData = globalRes.ok ? await globalRes.json() : null;
+
+                if (globalData?.data?.roleSourceAccess) {
+                    sourceAccessStore.set(globalData.data.roleSourceAccess);
+                }
+
+                const hasSession = !!sessionData?.session;
+                const groupAllowsPremium = !hasSession ||
+                    canRoleAccessSourceKind(sessionData.session.role, 'premium');
 
                 if (mounted) {
-                    // 管理员与高级会员无需额外密码；没有配置高级密码时也直接放行
-                    setIsLocked(data.hasPremiumAuth && !unlocked && !privilegedSession);
+                    if (!groupAllowsPremium) {
+                        // 已登录但所属用户组未开放 18+ 源，直接拒绝
+                        setDenied(true);
+                        setIsLocked(true);
+                    } else {
+                        // 已登录且用户组允许：无需额外密码；未登录时沿用高级密码
+                        setIsLocked(data.hasPremiumAuth && !unlocked && !hasSession);
+                    }
                     setIsClient(true);
                 }
             } catch {
@@ -77,6 +93,32 @@ export function PremiumPasswordGate({ children }: { children: React.ReactNode })
     };
 
     if (!isClient) return null;
+
+    if (denied) {
+        return (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black text-white">
+                <div className="w-full max-w-md p-4">
+                    <div className="bg-[var(--glass-bg)] backdrop-blur-[25px] saturate-[180%] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] p-8 shadow-[var(--shadow-md)] flex flex-col items-center gap-6 text-center">
+                        <div className="w-16 h-16 rounded-[var(--radius-full)] bg-red-500/10 flex items-center justify-center text-red-500 mb-2 shadow-[var(--shadow-sm)] border border-[var(--glass-border)]">
+                            <Lock size={32} />
+                        </div>
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-bold">无法访问</h2>
+                            <p className="text-[var(--text-color-secondary)]">
+                                当前用户组没有查看 18+ 源的权限，请联系管理员调整用户组设置。
+                            </p>
+                        </div>
+                        <a
+                            href="/"
+                            className="px-4 py-2 rounded-[var(--radius-2xl)] bg-[var(--accent-color)] text-white text-sm font-semibold hover:brightness-110 transition-all duration-200"
+                        >
+                            返回首页
+                        </a>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (!isLocked) {
         return <>{children}</>;

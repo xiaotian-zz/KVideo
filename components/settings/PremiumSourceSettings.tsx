@@ -42,15 +42,16 @@ export function PremiumSourceSettings({
         onSourcesChange(updated);
     };
 
-    const handleReorder = (id: string, direction: 'up' | 'down') => {
-        const currentIndex = sources.findIndex(s => s.id === id);
-        if (currentIndex === -1) return;
+    const handleReorder = (dragId: string, targetId: string) => {
+        if (dragId === targetId) return;
 
-        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-        if (newIndex < 0 || newIndex >= sources.length) return;
+        const from = sources.findIndex(s => s.id === dragId);
+        const to = sources.findIndex(s => s.id === targetId);
+        if (from === -1 || to === -1) return;
 
-        const updated = [...sources];
-        [updated[currentIndex], updated[newIndex]] = [updated[newIndex], updated[currentIndex]];
+        const updated = sources.map(s => ({ ...s }));
+        const [moved] = updated.splice(from, 1);
+        updated.splice(to, 0, moved);
 
         // Update priorities
         updated.forEach((s, idx) => s.priority = idx + 1);

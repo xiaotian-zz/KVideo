@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
-import { MainNav } from '@/components/layout/MainNav';
 import { MovieCard } from '@/components/home/MovieCard';
 import { DoubanSelector } from '@/components/douban/DoubanSelector';
 
@@ -289,7 +288,6 @@ function DoubanCategoryContent() {
   return (
     <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
       <Navbar onReset={() => router.push('/')} />
-      <MainNav />
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-5">
         <div>

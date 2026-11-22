@@ -1,12 +1,13 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import type { VideoSource } from '@/lib/types';
 
 interface SourceManagerProps {
   sources: VideoSource[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onReorder: (id: string, direction: 'up' | 'down') => void;
+  onReorder: (dragId: string, targetId: string) => void;
   onEdit?: (source: VideoSource) => void;
   defaultIds: string[];
   premium?: boolean;
@@ -21,30 +22,98 @@ export function SourceManager({
   defaultIds,
   premium = false
 }: SourceManagerProps) {
-  const handleToggle = (id: string) => {
-    onToggle(id);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const dragBlockedRef = useRef(false);
+
+  const resetDragState = () => {
+    setDraggingId(null);
+    setDragOverId(null);
   };
 
-  const handleDelete = (id: string) => {
-    onDelete(id);
+  // 从按钮、输入框等交互控件按下时不触发整卡拖动
+  const handleCardMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    dragBlockedRef.current = !!target.closest('button, input, select, textarea, a, label');
   };
 
-  const handlePriorityChange = (id: string, direction: 'up' | 'down') => {
-    onReorder(id, direction);
+  const handleDragStart = (event: React.DragEvent<HTMLDivElement>, id: string) => {
+    if (dragBlockedRef.current) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', id);
+    event.dataTransfer.setDragImage(event.currentTarget, 24, 24);
+    setDraggingId(id);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>, id: string) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (!draggingId || draggingId === id) return;
+
+    // 悬停到另一张卡片时立即交换位置，实现不松手即可排序
+    if (dragOverId !== id) {
+      setDragOverId(id);
+      onReorder(draggingId, id);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    if (dragOverId !== id) return;
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setDragOverId(null);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    // 拖动过程中已经实时换位，松手时只需清理状态
+    resetDragState();
   };
 
   return (
     <div className="space-y-3">
-      {sources.map((source, index) => (
+      {sources.map((source) => (
         <div
           key={source.id}
-          className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-[var(--radius-2xl)] p-4 transition-all duration-300"
+          data-source-card
+          draggable
+          onMouseDown={handleCardMouseDown}
+          onDragStart={(event) => handleDragStart(event, source.id)}
+          onDragEnd={resetDragState}
+          onDragOver={(e) => handleDragOver(e, source.id)}
+          onDragLeave={(e) => handleDragLeave(e, source.id)}
+          onDrop={(e) => handleDrop(e)}
+          className={`bg-[var(--glass-bg)] backdrop-blur-xl border rounded-[var(--radius-2xl)] p-4 transition-all duration-300 ${
+            draggingId === source.id
+              ? 'opacity-40 border-dashed border-[var(--accent-color)]'
+              : dragOverId === source.id
+                ? 'border-[var(--accent-color)] ring-2 ring-[var(--accent-color)]'
+                : 'border-[var(--glass-border)]'
+          }`}
         >
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">
+              {/* Drag Handle */}
+              <span
+                className="shrink-0 w-5 h-8 flex items-center justify-center text-[var(--text-color-secondary)] cursor-grab active:cursor-grabbing select-none"
+                aria-label={`拖动 ${source.name} 排序`}
+                title="按住卡片任意位置拖动排序"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="9" cy="6" r="1.6" />
+                  <circle cx="15" cy="6" r="1.6" />
+                  <circle cx="9" cy="12" r="1.6" />
+                  <circle cx="15" cy="12" r="1.6" />
+                  <circle cx="9" cy="18" r="1.6" />
+                  <circle cx="15" cy="18" r="1.6" />
+                </svg>
+              </span>
+
               {/* Toggle Switch */}
               <button
-                onClick={() => handleToggle(source.id)}
+                onClick={() => onToggle(source.id)}
                 className="relative inline-block w-12 h-7 flex-shrink-0 cursor-pointer"
                 aria-label={`切换 ${source.name} 状态`}
               >
@@ -62,7 +131,7 @@ export function SourceManager({
 
               {/* Source Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center">
                   {(premium || source.group === 'premium') && (
                     <span className="shrink-0" aria-label="18+ 源">🔞</span>
                   )}
@@ -78,29 +147,6 @@ export function SourceManager({
 
             {/* Controls */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Priority Controls */}
-              <button
-                onClick={() => handlePriorityChange(source.id, 'up')}
-                disabled={index === 0}
-                className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
-                aria-label="上移"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              </button>
-
-              <button
-                onClick={() => handlePriorityChange(source.id, 'down')}
-                disabled={index === sources.length - 1}
-                className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
-                aria-label="下移"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 5v14M19 12l-7 7-7-7" />
-                </svg>
-              </button>
-
               {/* Edit Button - Only for custom sources */}
               {onEdit && !defaultIds.includes(source.id) && (
                 <button
@@ -117,7 +163,7 @@ export function SourceManager({
 
               {/* Delete Button */}
               <button
-                onClick={() => handleDelete(source.id)}
+                onClick={() => onDelete(source.id)}
                 className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 cursor-pointer"
                 aria-label="删除视频源"
               >

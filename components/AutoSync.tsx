@@ -9,7 +9,6 @@ import {
   useSearchHistoryStore,
   usePremiumSearchHistoryStore,
 } from '@/lib/store/search-history-store';
-import { useIPTVStore } from '@/lib/store/iptv-store';
 import { settingsStore, type AppSettings } from '@/lib/store/settings-store';
 import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
 import { userSourcesStore } from '@/lib/store/user-sources-store';
@@ -39,10 +38,6 @@ function localSnapshots(): UserDataSnapshot {
     'search-history': useSearchHistoryStore.getState().searchHistory,
     'premium-search-history': usePremiumSearchHistoryStore.getState().searchHistory,
     'user-sources': userSourcesStore.getState(),
-    iptv: {
-      sources: useIPTVStore.getState().sources.filter((source) => source.kind !== 'builtin'),
-      lastRefreshed: useIPTVStore.getState().lastRefreshed,
-    },
   };
 }
 
@@ -99,27 +94,11 @@ function applyRemoteData(data: UserDataSnapshot): void {
   if (data['user-sources'] && typeof data['user-sources'] === 'object') {
     userSourcesStore.replaceState(data['user-sources'] as never);
   }
-
-  if (data.iptv && typeof data.iptv === 'object') {
-    const iptv = data.iptv as { sources?: unknown; lastRefreshed?: unknown };
-    const sources = Array.isArray(iptv.sources) ? iptv.sources : [];
-    // 空数组视为远端尚未初始化，避免覆盖本地已有数据
-    if (sources.length > 0) {
-      useIPTVStore.setState({
-        sources: sources as never,
-        lastRefreshed: typeof iptv.lastRefreshed === 'number' ? iptv.lastRefreshed : 0,
-      });
-    }
-  }
 }
 
-function isEmptyRemoteValue(namespace: string, value: unknown): boolean {
+function isEmptyRemoteValue(value: unknown): boolean {
   if (value == null) return true;
   if (Array.isArray(value)) return value.length === 0;
-  if (namespace === 'iptv') {
-    const sources = (value as { sources?: unknown }).sources;
-    return !Array.isArray(sources) || sources.length === 0;
-  }
   return false;
 }
 
@@ -182,7 +161,7 @@ export function AutoSync() {
       const local = localSnapshots();
       await Promise.all(
         Object.entries(local)
-          .filter(([namespace]) => isEmptyRemoteValue(namespace, remote[namespace]))
+          .filter(([namespace]) => isEmptyRemoteValue(remote[namespace]))
           .map(([namespace, data]) => pushNamespace(namespace, data))
       );
 
@@ -206,12 +185,6 @@ export function AutoSync() {
         }),
         usePremiumSearchHistoryStore.subscribe((state) => {
           schedulePush('premium-search-history', () => state.searchHistory);
-        }),
-        useIPTVStore.subscribe((state) => {
-          schedulePush('iptv', () => ({
-            sources: state.sources.filter((source) => source.kind !== 'builtin'),
-            lastRefreshed: state.lastRefreshed,
-          }));
         }),
         settingsStore.subscribe(() => {
           schedulePush('settings', () => personalSettings());

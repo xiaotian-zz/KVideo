@@ -63,36 +63,44 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-function MainNavInner() {
+function MainNavInner({ inline = false }: { inline?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const type = searchParams.get('type');
 
+  const pills = (
+    <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
+      {NAV_ITEMS.map((item) => {
+        const Icon = item.icon;
+        const isActive = item.match(pathname, type);
+
+        return (
+          <Link
+            key={item.label}
+            href={item.href}
+            aria-label={item.label}
+            title={item.label}
+            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2 text-sm font-bold whitespace-nowrap rounded-[var(--radius-full)] border transition-all duration-200 ${
+              isActive
+                ? 'bg-[var(--accent-color)] text-white border-transparent shadow-[0_0_15px_rgba(0,122,255,0.4)]'
+                : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-color-secondary)] hover:text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)]'
+            }`}
+          >
+            <Icon size={15} />
+            {item.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+
+  if (inline) {
+    return <div className="flex justify-center min-w-0 max-w-full">{pills}</div>;
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-2">
-      <div className="flex justify-center">
-        <div className="inline-flex max-w-full gap-1 p-1 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-full backdrop-blur-2xl shadow-lg ring-1 ring-white/10 overflow-x-auto">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = item.match(pathname, type);
-
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 text-sm font-bold rounded-full transition-all duration-200 ${
-                  isActive
-                    ? 'bg-[var(--accent-color)] text-white shadow-[0_0_15px_rgba(0,122,255,0.4)]'
-                    : 'text-[var(--text-color-secondary)] hover:text-[var(--text-color)]'
-                }`}
-              >
-                <Icon size={15} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+      <div className="flex justify-center">{pills}</div>
     </div>
   );
 }
@@ -101,10 +109,10 @@ function MainNavInner() {
  * 主导航：精品推荐、源浏览器、电影、剧集、短剧、动漫、综艺、直播。
  * 首页原有的分类切换已合并到这一排胶囊中。
  */
-export function MainNav() {
+export function MainNav({ inline = false }: { inline?: boolean }) {
   return (
-    <Suspense fallback={<div className="h-12" />}>
-      <MainNavInner />
+    <Suspense fallback={inline ? null : <div className="h-12" />}>
+      <MainNavInner inline={inline} />
     </Suspense>
   );
 }

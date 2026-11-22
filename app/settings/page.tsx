@@ -5,10 +5,12 @@ import { ExportModal } from '@/components/settings/ExportModal';
 import { ImportModal } from '@/components/settings/ImportModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SourceSettings } from '@/components/settings/SourceSettings';
+import { IPTVSourceSettings } from '@/components/settings/IPTVSourceSettings';
 import { SortSettings } from '@/components/settings/SortSettings';
 import { DataSettings } from '@/components/settings/DataSettings';
 import { AccountSettings } from '@/components/settings/AccountSettings';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
+import { SiteTitleSettings } from '@/components/settings/SiteTitleSettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { AppVersionSettings } from '@/components/settings/AppVersionSettings';
@@ -113,6 +115,11 @@ export default function SettingsPage() {
               ),
             },
             {
+              id: 'iptv',
+              label: '直播源',
+              content: <IPTVSourceSettings />,
+            },
+            {
               id: 'metadata',
               label: '元数据',
               content: <MetadataSettings />,
@@ -147,6 +154,7 @@ export default function SettingsPage() {
               label: '显示',
               content: (
                 <div>
+                  <SiteTitleSettings />
                   <DisplaySettings
                     realtimeLatency={realtimeLatency}
                     searchDisplayMode={searchDisplayMode}

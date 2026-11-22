@@ -4,17 +4,26 @@ import {
   normalizeMetadataConfig,
   type MetadataConfig,
 } from '@/lib/metadata';
+import {
+  DEFAULT_ROLE_SOURCE_ACCESS,
+  normalizeRoleSourceAccess,
+  type RoleSourceAccess,
+} from '@/lib/auth/permissions';
 import type { SourceSubscription, VideoSource } from '@/lib/types';
+import type { IPTVSource } from '@/lib/store/iptv-store';
 
 /**
  * 全局配置：由管理员维护，所有用户共用。
- * 视频源、代理配置和豆瓣 Cookies 都只存这一份。
+ * 视频源、直播源、代理配置和豆瓣 Cookies 都只存这一份。
  */
 export interface GlobalConfig {
   sources: VideoSource[];
   premiumSources: VideoSource[];
   subscriptions: SourceSubscription[];
+  iptvSources: IPTVSource[];
+  siteTitle: string;
   metadata: MetadataConfig;
+  roleSourceAccess: RoleSourceAccess;
   updatedAt: number;
 }
 
@@ -37,6 +46,14 @@ function isSubscription(value: unknown): value is SourceSubscription {
     typeof subscription.url === 'string';
 }
 
+function isIPTVSource(value: unknown): value is IPTVSource {
+  if (!value || typeof value !== 'object') return false;
+  const source = value as Partial<IPTVSource>;
+  return typeof source.id === 'string' &&
+    typeof source.name === 'string' &&
+    typeof source.url === 'string';
+}
+
 export function normalizeGlobalConfig(value: unknown): GlobalConfig | null {
   if (!value || typeof value !== 'object') return null;
   const input = value as Partial<GlobalConfig>;
@@ -49,9 +66,14 @@ export function normalizeGlobalConfig(value: unknown): GlobalConfig | null {
     subscriptions: Array.isArray(input.subscriptions)
       ? input.subscriptions.filter(isSubscription)
       : [],
+    iptvSources: Array.isArray(input.iptvSources)
+      ? input.iptvSources.filter(isIPTVSource)
+      : [],
+    siteTitle: typeof input.siteTitle === 'string' ? input.siteTitle : '',
     metadata: input.metadata
       ? normalizeMetadataConfig(input.metadata)
       : { ...DEFAULT_METADATA_CONFIG },
+    roleSourceAccess: normalizeRoleSourceAccess(input.roleSourceAccess),
     updatedAt: typeof input.updatedAt === 'number' ? input.updatedAt : Date.now(),
   };
 }
@@ -80,10 +102,15 @@ export async function writeGlobalConfig(value: unknown): Promise<GlobalConfig> {
     sources: input.sources ?? existing?.sources ?? [],
     premiumSources: input.premiumSources ?? existing?.premiumSources ?? [],
     subscriptions: input.subscriptions ?? existing?.subscriptions ?? [],
+    iptvSources: input.iptvSources ?? existing?.iptvSources ?? [],
+    siteTitle: input.siteTitle ?? existing?.siteTitle ?? '',
     metadata: {
       ...(existing?.metadata ?? DEFAULT_METADATA_CONFIG),
       ...(input.metadata ?? {}),
     },
+    roleSourceAccess: input.roleSourceAccess
+      ?? existing?.roleSourceAccess
+      ?? DEFAULT_ROLE_SOURCE_ACCESS,
     updatedAt: Date.now(),
   });
 

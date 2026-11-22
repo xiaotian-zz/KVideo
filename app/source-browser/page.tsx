@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
-import { MainNav } from '@/components/layout/MainNav';
 import { CategoryPills } from '@/components/ui/CategoryPills';
 import { MovieCard } from '@/components/home/MovieCard';
 import { settingsStore, type AppSettings } from '@/lib/store/settings-store';
+import { getSession } from '@/lib/store/auth-store';
+import { canRoleAccessSourceKind } from '@/lib/store/source-access-store';
 import type { VideoSource } from '@/lib/types';
 
 interface SourceCategory {
@@ -44,6 +45,7 @@ function getPageItems(current: number, total: number): Array<number | 'ellipsis'
 export default function SourceBrowserPage() {
   const router = useRouter();
   const [sources, setSources] = useState<VideoSource[]>([]);
+  const [premiumSourceIds, setPremiumSourceIds] = useState<string[]>([]);
   const [activeSourceId, setActiveSourceId] = useState('');
   const [categories, setCategories] = useState<SourceCategory[]>([]);
   const [activeType, setActiveType] = useState('');
@@ -56,7 +58,24 @@ export default function SourceBrowserPage() {
 
   useEffect(() => {
     const syncSources = (settings: AppSettings) => {
-      setSources(settings.sources.filter((source) => source.enabled));
+      const role = getSession()?.role;
+      const canViewNormal = canRoleAccessSourceKind(role, 'normal');
+      const canViewPremium = canRoleAccessSourceKind(role, 'premium');
+      const nextPremiumIds = canViewPremium
+        ? settings.premiumSources.map((source) => source.id)
+        : [];
+
+      setPremiumSourceIds(nextPremiumIds);
+      setSources([
+        ...(canViewNormal ? settings.sources : []),
+        ...(canViewPremium ? settings.premiumSources : []),
+      ]
+        .filter((source) => source.enabled)
+        .sort((left, right) => {
+          const leftPriority = left.priority ?? Number.MAX_SAFE_INTEGER;
+          const rightPriority = right.priority ?? Number.MAX_SAFE_INTEGER;
+          return leftPriority - rightPriority;
+        }));
     };
 
     syncSources(settingsStore.getSettings());
@@ -164,7 +183,6 @@ export default function SourceBrowserPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
       <Navbar onReset={() => router.push('/')} />
-      <MainNav />
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-5">
         <h1 className="text-2xl font-bold text-[var(--text-color)]">源浏览器</h1>
@@ -176,7 +194,10 @@ export default function SourceBrowserPage() {
         ) : (
           <>
             <CategoryPills
-              items={sources.map((source) => ({ id: source.id, name: source.name }))}
+              items={sources.map((source) => ({
+                id: source.id,
+                name: premiumSourceIds.includes(source.id) ? `🔞${source.name}` : source.name,
+              }))}
               activeId={activeSourceId}
               onChange={handleSourceChange}
             />
@@ -222,12 +243,16 @@ export default function SourceBrowserPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {items.map((item) => {
                     const activeSource = sources.find((source) => source.id === activeSourceId);
-                    const playerUrl = `/player?${new URLSearchParams({
+                    const playerParams = new URLSearchParams({
                       id: item.id,
                       source: activeSourceId,
                       sourceName: activeSource?.name || activeSourceId,
                       title: item.title,
-                    }).toString()}`;
+                    });
+                    if (premiumSourceIds.includes(activeSourceId)) {
+                      playerParams.set('premium', '1');
+                    }
+                    const playerUrl = `/player?${playerParams.toString()}`;
 
                     return (
                       <MovieCard

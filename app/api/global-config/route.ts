@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
           sources: data.sources,
           premiumSources: data.premiumSources,
           subscriptions: data.subscriptions,
+          iptvSources: data.iptvSources,
+          siteTitle: data.siteTitle,
+          roleSourceAccess: data.roleSourceAccess,
           updatedAt: data.updatedAt,
         };
 

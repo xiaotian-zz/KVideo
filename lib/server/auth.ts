@@ -280,7 +280,8 @@ export function toPublicSession(session: ServerAuthSession): PublicSessionData {
     accountId: session.accountId,
     profileId: session.profileId,
     username: session.username,
-    name: session.name,
+    // 账户不再使用昵称，显示名称统一为用户名
+    name: session.username || session.name,
     role: session.role,
     customPermissions: session.customPermissions.length > 0 ? session.customPermissions : undefined,
     mode: 'managed',
@@ -338,7 +339,7 @@ export async function getAuthoritativeSessionFromSession(
     accountId: account.id,
     profileId: account.id,
     username: account.username,
-    name: account.name,
+    name: account.username,
     role: account.role,
     customPermissions: [],
     mode: 'managed',
@@ -376,7 +377,7 @@ async function authenticateManagedLogin(username: string, password: string): Pro
     accountId: account.id,
     profileId: account.id,
     username: account.username,
-    name: account.name,
+    name: account.username,
     role: account.role,
     customPermissions: [],
     mode: 'managed',
@@ -477,7 +478,7 @@ export async function listAccountInfo(): Promise<AccountInfo[]> {
   return accounts.map((account) => ({
     id: account.id,
     username: account.username,
-    name: account.name,
+    name: account.username,
     role: account.role,
     customPermissions: [],
     banned: account.banned,
@@ -520,8 +521,8 @@ export async function createManagedAccount(body: unknown): Promise<AccountInfo> 
   }
 
   const input = sanitizeAccountInput(body);
-  if (!input.username || !input.name || !input.password || !input.role) {
-    throw new Error('Username, name, password and role are required');
+  if (!input.username || !input.password || !input.role) {
+    throw new Error('Username, password and role are required');
   }
 
   const accounts = await ensureManagedAccountsBootstrapped();
@@ -532,7 +533,8 @@ export async function createManagedAccount(body: unknown): Promise<AccountInfo> 
   const created = await createStoredAccount({
     username: input.username,
     password: input.password,
-    name: input.name,
+    // 账户不再提供昵称，显示名称统一使用用户名
+    name: input.username,
     role: input.role,
     customPermissions: [],
   });
@@ -572,7 +574,8 @@ export async function updateManagedAccount(
   const current = accounts[accountIndex];
   const updated: StoredAccountRecord = {
     ...current,
-    name: input.name || current.name,
+    // 账户不再使用昵称，显示名称统一为用户名
+    name: current.username,
     role: input.role || current.role,
     customPermissions: [],
     banned: input.banned ?? current.banned,
@@ -596,7 +599,7 @@ export async function updateManagedAccount(
   return {
     id: updated.id,
     username: updated.username,
-    name: updated.name,
+    name: updated.username,
     role: updated.role,
     customPermissions: [],
     banned: updated.banned,

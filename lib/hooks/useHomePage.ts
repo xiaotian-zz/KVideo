@@ -4,6 +4,8 @@ import { useSearchCache } from '@/lib/hooks/useSearchCache';
 import { useParallelSearch } from '@/lib/hooks/useParallelSearch';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
 import { settingsStore, type SortOption } from '@/lib/store/settings-store';
+import { getSession } from '@/lib/store/auth-store';
+import { canRoleAccessSourceKind } from '@/lib/store/source-access-store';
 
 export function useHomePage() {
     useSubscriptionSync();
@@ -47,7 +49,9 @@ export function useHomePage() {
         if (!searchQuery.trim()) return false;
 
         const settings = settingsStore.getSettings();
-        const allSources = settings.sources.filter(s => s.enabled);
+        const allSources = canRoleAccessSourceKind(getSession()?.role, 'normal')
+            ? settings.sources.filter(s => s.enabled)
+            : [];
 
         if (allSources.length === 0) {
             return false;
@@ -80,7 +84,9 @@ export function useHomePage() {
             // Check if we need to re-trigger search due to new sources being loaded
             // This fixes the issue where initial visit has 0 sources, then sources are loaded async
             // but the search (or lack thereof) is already stuck with empty sources.
-            const enabledSources = settings.sources.filter(s => s.enabled);
+            const enabledSources = canRoleAccessSourceKind(getSession()?.role, 'normal')
+                ? settings.sources.filter(s => s.enabled)
+                : [];
             const hasSources = enabledSources.length > 0;
 
             // If we have a query, and we haven't searched with sources yet,

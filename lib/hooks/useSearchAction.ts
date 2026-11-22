@@ -5,6 +5,8 @@ import { processSearchStream } from '@/lib/utils/search-stream';
 import type { SortOption } from '@/lib/store/settings-store';
 import type { Video, SourceBadge } from '@/lib/types';
 import { settingsStore } from '@/lib/store/settings-store';
+import { getSession } from '@/lib/store/auth-store';
+import { canRoleAccessSourceKind } from '@/lib/store/source-access-store';
 import { useSearchState } from './useSearchState';
 
 type SearchState = ReturnType<typeof useSearchState>;
@@ -43,10 +45,12 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
         let targetSources = sources;
         if (!targetSources || targetSources.length === 0) {
             const settings = settingsStore.getSettings();
-            targetSources = [
-                ...settings.sources,
-                ...settings.subscriptions.filter(s => (s as { enabled?: boolean }).enabled !== false), // Include valid subscriptions
-            ].filter(s => (s as { enabled?: boolean }).enabled !== false);
+            targetSources = canRoleAccessSourceKind(getSession()?.role, 'normal')
+                ? [
+                    ...settings.sources,
+                    ...settings.subscriptions.filter(s => (s as { enabled?: boolean }).enabled !== false), // Include valid subscriptions
+                  ].filter(s => (s as { enabled?: boolean }).enabled !== false)
+                : [];
         }
 
         // Abort any ongoing search

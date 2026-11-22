@@ -5,15 +5,19 @@ import { join } from 'node:path';
 
 const projectRoot = process.cwd();
 
-test('navbar keeps logout available below the desktop breakpoint', () => {
+test('navbar exposes user menu with history, favorites, settings and logout', () => {
   const source = readFileSync(
     join(projectRoot, 'components/layout/Navbar.tsx'),
     'utf8',
   );
 
-  assert.match(source, /\{session && \(\s*<div className="flex items-center gap-1 sm:gap-2">/);
-  assert.match(source, /<div className="hidden sm:flex[^>]*>[\s\S]*?session\.name/);
-  assert.doesNotMatch(source, /\{session && \(\s*<div className="hidden sm:flex/);
+  assert.match(source, /aria-label="用户菜单"/);
+  assert.match(source, /session\.username \|\| session\.name/);
+  assert.match(source, /'管理员'[\s\S]*?'高级会员'[\s\S]*?'普通用户'/);
+  assert.match(source, /观看历史/);
+  assert.match(source, /href=\{favoritesHref\}/);
+  assert.match(source, /session\.role === 'admin' && \([\s\S]*?href=\{settingsHref\}/);
+  assert.match(source, /退出登录/);
 });
 
 test('premium settings includes the shared account management section', () => {

@@ -3,7 +3,7 @@
  * Displays movie poster, title, and rating
  */
 
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
@@ -24,15 +24,44 @@ interface MovieCardProps {
   openInNewTab?: boolean;
 }
 
+type ImageStage = 'direct' | 'proxy' | 'placeholder' | 'none';
+
 export const MovieCard = memo(function MovieCard({
   movie,
   onMovieClick,
   href,
   openInNewTab = false,
 }: MovieCardProps) {
-  const [imageError, setImageError] = useState(false);
-  const [fallbackError, setFallbackError] = useState(false);
+  const hasExternalCover = /^https?:\/\//i.test(movie.cover);
+  const [imageStage, setImageStage] = useState<ImageStage>(() =>
+    movie.cover ? 'direct' : 'placeholder'
+  );
   const videoUrl = href ?? `/?q=${encodeURIComponent(movie.title)}`;
+
+  useEffect(() => {
+    setImageStage(movie.cover ? 'direct' : 'placeholder');
+  }, [movie.cover]);
+
+  const imageSrc = imageStage === 'proxy'
+    ? `/api/source-image?url=${encodeURIComponent(movie.cover)}`
+    : imageStage === 'placeholder'
+      ? '/placeholder-poster.svg'
+      : movie.cover;
+
+  const handleImageError = () => {
+    if (imageStage === 'direct') {
+      // 本机直连失败后交给服务器代理再试一次；站内代理图直接进入占位图
+      setImageStage(hasExternalCover ? 'proxy' : 'placeholder');
+      return;
+    }
+    if (imageStage === 'proxy') {
+      setImageStage('placeholder');
+      return;
+    }
+    if (imageStage === 'placeholder') {
+      setImageStage('none');
+    }
+  };
 
   return (
     <Link
@@ -62,9 +91,10 @@ export const MovieCard = memo(function MovieCard({
     >
       <Card hover={false} className="p-0 h-full shadow-[0_2px_8px_var(--shadow-color)] hover:shadow-[0_8px_24px_var(--shadow-color)] transition-shadow duration-200 ease-out" blur={false}>
         <div className="relative aspect-[2/3] bg-[var(--glass-bg)] rounded-[var(--radius-2xl)]">
-          {!imageError ? (
+          {imageStage !== 'none' ? (
             <Image
-              src={movie.cover}
+              key={imageStage}
+              src={imageSrc}
               alt={movie.title}
               fill
               className="object-cover transition-transform duration-300 group-hover:scale-105 rounded-[var(--radius-2xl)]"
@@ -72,17 +102,7 @@ export const MovieCard = memo(function MovieCard({
               loading="eager"
               unoptimized
               referrerPolicy="no-referrer"
-              onError={() => setImageError(true)}
-            />
-          ) : !fallbackError ? (
-            <Image
-              src="/placeholder-poster.svg"
-              alt={movie.title}
-              fill
-              className="object-cover rounded-[var(--radius-2xl)]"
-              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-              unoptimized
-              onError={() => setFallbackError(true)}
+              onError={handleImageError}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-[var(--glass-bg)] rounded-[var(--radius-2xl)]">

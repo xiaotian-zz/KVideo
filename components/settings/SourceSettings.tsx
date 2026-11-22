@@ -25,7 +25,17 @@ export function SourceSettings({
     const [showAllSources, setShowAllSources] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const allSources = [...sources, ...premiumSources];
+    const isPremiumSource = (id: string) => premiumSources.some(s => s.id === id);
+
+    // 普通源与 18+ 源合并展示，按统一优先级排序
+    const allSources = [...sources, ...premiumSources]
+        .map((source, index) => ({ source, index }))
+        .sort((left, right) => {
+            const leftPriority = left.source.priority ?? Number.MAX_SAFE_INTEGER;
+            const rightPriority = right.source.priority ?? Number.MAX_SAFE_INTEGER;
+            return leftPriority - rightPriority || left.index - right.index;
+        })
+        .map(({ source }) => source);
 
     const filteredSources = allSources.filter(source =>
         source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -35,8 +45,6 @@ export function SourceSettings({
     const displayedSources = showAllSources || searchQuery
         ? filteredSources
         : filteredSources.slice(0, 10);
-
-    const isPremiumSource = (id: string) => premiumSources.some(s => s.id === id);
 
     const handleToggle = (id: string) => {
         if (isPremiumSource(id)) {
@@ -58,22 +66,22 @@ export function SourceSettings({
         onSourcesChange(sources.filter(s => s.id !== id));
     };
 
-    const handleReorder = (id: string, direction: 'up' | 'down') => {
-        const premium = isPremiumSource(id);
-        const list = premium ? premiumSources : sources;
-        const currentIndex = list.findIndex(s => s.id === id);
-        if (currentIndex === -1) return;
+    const handleReorder = (dragId: string, targetId: string) => {
+        if (dragId === targetId) return;
 
-        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-        if (newIndex < 0 || newIndex >= list.length) return;
+        const from = allSources.findIndex(s => s.id === dragId);
+        const to = allSources.findIndex(s => s.id === targetId);
+        if (from === -1 || to === -1) return;
 
-        const updated = [...list];
-        [updated[currentIndex], updated[newIndex]] = [updated[newIndex], updated[currentIndex]];
+        // 合并列表中重排，再按原本归属拆回普通源/18+ 源
+        const updated = allSources.map(s => ({ ...s }));
+        const [moved] = updated.splice(from, 1);
+        updated.splice(to, 0, moved);
 
         // Update priorities
         updated.forEach((s, idx) => s.priority = idx + 1);
-        if (premium) onPremiumSourcesChange(updated);
-        else onSourcesChange(updated);
+        onSourcesChange(updated.filter(s => !isPremiumSource(s.id)));
+        onPremiumSourcesChange(updated.filter(s => isPremiumSource(s.id)));
     };
 
     return (

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Ban, Info, KeyRound, LogOut, Shield, Trash2, UserPlus } from 'lucide-react';
 import { clearSession, getSession, type Role } from '@/lib/store/auth-store';
 import { SettingsSection } from './SettingsSection';
+import { UserGroupSettings } from './UserGroupSettings';
 
 interface AccountInfo {
   id: string;
@@ -51,7 +52,6 @@ export function AccountSettings() {
   const [success, setSuccess] = useState('');
 
   const [newUsername, setNewUsername] = useState('');
-  const [newName, setNewName] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<Role>('user');
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
@@ -84,9 +84,8 @@ export function AccountSettings() {
 
   const createAccount = async () => {
     const username = newUsername.trim();
-    const name = newName.trim();
-    if (!username || !name || !newPassword) {
-      setError('请填写用户名、显示名称和初始密码');
+    if (!username || !newPassword) {
+      setError('请填写用户名和初始密码');
       return;
     }
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
@@ -105,14 +104,13 @@ export function AccountSettings() {
       const response = await fetch('/api/auth/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, name, role: newRole, password: newPassword }),
+        body: JSON.stringify({ username, role: newRole, password: newPassword }),
       });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data?.error || '创建账户失败');
       }
       setNewUsername('');
-      setNewName('');
       setNewPassword('');
       setNewRole('user');
       setSuccess('账户已创建');
@@ -186,19 +184,16 @@ export function AccountSettings() {
           <div className="flex items-center justify-between gap-4 p-4 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)]">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-[var(--radius-full)] bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)] font-bold text-lg border border-[var(--glass-border)]">
-                {session.name.charAt(0)}
+                {(session.username || session.name).charAt(0)}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text-color)] truncate">{session.name}</p>
+                <p className="text-sm font-medium text-[var(--text-color)] truncate">{session.username || session.name}</p>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <Shield
                     size={12}
                     className={session.role === 'admin' ? 'text-[var(--accent-color)]' : 'text-[var(--text-color-secondary)]'}
                   />
                   <span className="text-xs text-[var(--text-color-secondary)]">{ROLE_LABELS[session.role]}</span>
-                  {session.username && (
-                    <span className="text-xs text-[var(--text-color-secondary)]">@{session.username}</span>
-                  )}
                 </div>
               </div>
             </div>
@@ -225,6 +220,8 @@ export function AccountSettings() {
           </div>
         </div>
 
+        <UserGroupSettings />
+
         {error && (
           <div className="p-3 rounded-[var(--radius-2xl)] border border-red-500/20 bg-red-500/10 text-sm text-red-400">
             {error}
@@ -242,18 +239,11 @@ export function AccountSettings() {
             <UserPlus size={16} className="text-[var(--accent-color)]" />
             新建账户
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <input
               value={newUsername}
               onChange={(event) => setNewUsername(event.target.value)}
               placeholder="用户名"
-              autoComplete="off"
-              className={INPUT_CLASS}
-            />
-            <input
-              value={newName}
-              onChange={(event) => setNewName(event.target.value)}
-              placeholder="显示名称"
               autoComplete="off"
               className={INPUT_CLASS}
             />
@@ -318,8 +308,7 @@ export function AccountSettings() {
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-[var(--text-color)]">{account.name}</span>
-                          <span className="text-xs text-[var(--text-color-secondary)]">@{account.username}</span>
+                          <span className="text-sm font-medium text-[var(--text-color)]">{account.username}</span>
                           <span className="px-2 py-0.5 text-[10px] rounded-[var(--radius-full)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
                             {ROLE_LABELS[account.role]}
                           </span>

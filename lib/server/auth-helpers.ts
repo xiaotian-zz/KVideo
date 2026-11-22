@@ -277,12 +277,12 @@ export function parseBootstrapAccounts(rawAccounts: string): SeedAccountInput[] 
       if (parts.length === 2) {
         [password, name] = parts;
       } else if (parts.length === 3) {
-        if (parts[2] === 'viewer' || parts[2] === 'admin' || parts[2] === 'super_admin') {
+        if (parts[2] === 'viewer' || parts[2] === 'admin' || parts[2] === 'premium') {
           [password, name, rolePart] = parts;
         } else {
           [username, password, name] = parts;
         }
-      } else if (parts.length === 4 && (parts[2] === 'viewer' || parts[2] === 'admin' || parts[2] === 'super_admin')) {
+      } else if (parts.length === 4 && (parts[2] === 'viewer' || parts[2] === 'admin' || parts[2] === 'premium')) {
         [password, name, rolePart, permissionsPart] = parts;
       } else {
         [username, password, name, rolePart, permissionsPart] = parts;

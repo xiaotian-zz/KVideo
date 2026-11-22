@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * IPTV Page - Live TV channel viewer with M3U source management
+ * IPTV Page - Live TV channel viewer
+ * 直播源由管理员在后台统一维护，所有用户共用。
  */
 
 import { useState, useEffect, useMemo } from 'react';
 import { useIPTVStore } from '@/lib/store/iptv-store';
-import { IPTVSourceManager } from '@/components/iptv/IPTVSourceManager';
 import { IPTVChannelGrid } from '@/components/iptv/IPTVChannelGrid';
 import { IPTVPlayer } from '@/components/iptv/IPTVPlayer';
 import { Icons } from '@/components/ui/Icon';
@@ -19,32 +19,20 @@ export default function IPTVPage() {
   const { iptvEnabled, restrictionSummary } = useRuntimeFeatures();
   const { sources, cachedChannels, cachedChannelsBySource, refreshSources, isLoading } = useIPTVStore();
   const [activeChannel, setActiveChannel] = useState<M3UChannel | null>(null);
-  const [showManager, setShowManager] = useState(false);
 
-  const canManageSources = hasPermission('iptv_source_management');
   const canAccessIPTV = hasPermission('iptv_access');
-  const canUseBuiltinSources = hasPermission('iptv_builtin_sources');
-  const visibleSources = useMemo(
-    () => sources.filter((source) => canUseBuiltinSources || source.kind !== 'builtin'),
-    [sources, canUseBuiltinSources]
+  const groups = useMemo(
+    () => Array.from(new Set(cachedChannels.map((channel) => channel.group).filter(Boolean))).sort() as string[],
+    [cachedChannels]
   );
-  const visibleSourceIds = useMemo(() => new Set(visibleSources.map((source) => source.id)), [visibleSources]);
-  const visibleChannels = useMemo(
-    () => cachedChannels.filter((channel) => !channel.sourceId || visibleSourceIds.has(channel.sourceId)),
-    [cachedChannels, visibleSourceIds]
-  );
-  const visibleGroups = useMemo(
-    () => Array.from(new Set(visibleChannels.map((channel) => channel.group).filter(Boolean))).sort() as string[],
-    [visibleChannels]
-  );
-  const visibleChannelsBySource = useMemo(
+  const channelsBySource = useMemo(
     () =>
       Object.fromEntries(
-        visibleSources
+        sources
           .map((source) => [source.id, cachedChannelsBySource[source.id]])
           .filter(([, data]) => !!data)
       ),
-    [visibleSources, cachedChannelsBySource]
+    [sources, cachedChannelsBySource]
   );
 
   // Auto-refresh on first load if we have sources but no cached channels
@@ -109,29 +97,12 @@ export default function IPTVPage() {
                     直播
                   </h1>
                   <p className="text-sm text-[var(--text-color-secondary)]">
-                    {visibleChannels.length > 0 ? `${visibleChannels.length} 个频道` : 'IPTV 直播频道'}
+                    {cachedChannels.length > 0 ? `${cachedChannels.length} 个频道` : 'IPTV 直播频道'}
                   </p>
                 </div>
               </div>
-
-              {canManageSources && (
-                <button
-                  onClick={() => setShowManager(!showManager)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] text-sm text-[var(--text-color)] hover:border-[var(--accent-color)]/30 transition-all cursor-pointer"
-                >
-                  <Icons.Settings size={16} />
-                  管理源
-                </button>
-              )}
             </div>
           </div>
-
-          {/* Source Manager (collapsible) */}
-          {showManager && (
-            <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
-              <IPTVSourceManager />
-            </div>
-          )}
 
           {/* Loading State */}
           {isLoading && (
@@ -145,12 +116,12 @@ export default function IPTVPage() {
           {!isLoading && (
             <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6">
               <IPTVChannelGrid
-                channels={visibleChannels}
-                groups={visibleGroups}
+                channels={cachedChannels}
+                groups={groups}
                 onSelect={setActiveChannel}
                 activeChannel={activeChannel}
-                channelsBySource={visibleChannelsBySource}
-                sources={visibleSources}
+                channelsBySource={channelsBySource}
+                sources={sources}
               />
             </div>
           )}
@@ -161,10 +132,10 @@ export default function IPTVPage() {
           <IPTVPlayer
             channel={activeChannel}
             onClose={() => setActiveChannel(null)}
-            channels={visibleChannels}
+            channels={cachedChannels}
             onChannelChange={setActiveChannel}
-            channelsBySource={visibleChannelsBySource}
-            sources={visibleSources}
+            channelsBySource={channelsBySource}
+            sources={sources}
           />
         )}
       </div>

@@ -22,7 +22,7 @@ function ViewerNotice() {
           {session && (
             <div className="flex items-center gap-2 px-4 py-2 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-full)] text-sm">
               <User size={16} className="text-[var(--text-color-secondary)]" />
-              <span>当前用户：{session.name}</span>
+              <span>当前用户：{session.username || session.name}</span>
               <span className="px-2 py-0.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-full)] text-xs text-[var(--text-color-secondary)]">
                 观众
               </span>

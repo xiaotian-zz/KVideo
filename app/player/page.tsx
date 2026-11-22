@@ -21,6 +21,8 @@ import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { getSourceName } from '@/lib/utils/source-names';
 import { retrieveGroupedSources, storeGroupedSources } from '@/lib/utils/grouped-sources-cache';
+import { getSession } from '@/lib/store/auth-store';
+import { canRoleAccessSourceKind } from '@/lib/store/source-access-store';
 
 type PlayerViewportMode = 'standard' | 'wide' | 'cinema';
 
@@ -36,6 +38,9 @@ function PlayerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const isPremium = searchParams.get('premium') === '1';
+  const sessionRole = getSession()?.role;
+  const premiumAccess = canRoleAccessSourceKind(sessionRole, 'premium');
+  const normalAccess = canRoleAccessSourceKind(sessionRole, 'normal');
   const { addToHistory } = useHistory(isPremium);
 
   const videoId = searchParams.get('id');
@@ -98,6 +103,13 @@ function PlayerContent() {
       router.push('/');
     }
   }, [missingRequiredParams, router]);
+
+  // 用户组没有 18+ 源权限时，不允许直接通过 URL 进入高级播放页
+  useEffect(() => {
+    if (isPremium && !premiumAccess) {
+      router.replace('/');
+    }
+  }, [isPremium, premiumAccess, router]);
 
   const [pendingFallback, setPendingFallback] = useState(false);
   const [discoveredSources, setDiscoveredSources] = useState<SourceInfo[]>([]);
@@ -216,7 +228,9 @@ function PlayerContent() {
     fetchedSourcesRef.current = true;
 
     const settings = settingsStore.getSettings();
-    const sourcesForMode = isPremium ? settings.premiumSources : settings.sources;
+    const sourcesForMode = isPremium
+      ? (premiumAccess ? settings.premiumSources : [])
+      : (normalAccess ? settings.sources : []);
     const allSources = sourcesForMode?.filter((s: VideoSource) => s.enabled !== false) || [];
     // Only search other sources (not the current one)
     const otherSources = allSources.filter((s: VideoSource) => s.id !== source);
@@ -288,7 +302,7 @@ function PlayerContent() {
     })();
 
     return () => controller.abort();
-  }, [groupedSourcesParam, gsKey, isPremium, pendingFallback, source, title]);
+  }, [groupedSourcesParam, gsKey, isPremium, normalAccess, premiumAccess, pendingFallback, source, title]);
 
   // Track current source for switching
   const [currentSourceId, setCurrentSourceId] = useState(source);
