@@ -20,6 +20,7 @@ import { pushGlobalConfig } from '@/lib/utils/global-config-client';
 
 export function useSettingsPage() {
     const [sources, setSources] = useState<VideoSource[]>([]);
+    const [premiumSources, setPremiumSources] = useState<VideoSource[]>([]);
     const [subscriptions, setSubscriptions] = useState<SourceSubscription[]>([]);
     const [sortBy, setSortBy] = useState<SortOption>('default');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -52,6 +53,7 @@ export function useSettingsPage() {
         const syncFromStore = () => {
             const settings = settingsStore.getSettings();
             setSources(settings.sources || []);
+            setPremiumSources(settings.premiumSources || []);
             setSubscriptions(settings.subscriptions || []);
             setSortBy(settings.sortBy);
             setRealtimeLatency(settings.realtimeLatency);
@@ -86,11 +88,22 @@ export function useSettingsPage() {
     };
 
     const handleAddSource = (source: VideoSource) => {
-        const exists = sources.some(s => s.id === source.id);
-        const updated = exists
-            ? sources.map(s => s.id === source.id ? source : s)
-            : [...sources, source];
-        handleSourcesChange(updated);
+        const currentSettings = settingsStore.getSettings();
+        const nextSources = currentSettings.sources.filter(s => s.id !== source.id);
+        const nextPremium = currentSettings.premiumSources.filter(s => s.id !== source.id);
+
+        if (source.group === 'premium') {
+            nextPremium.push({ ...source, group: 'premium' });
+        } else {
+            nextSources.push({ ...source, group: 'normal' });
+        }
+
+        settingsStore.saveSettings({
+            ...currentSettings,
+            sources: nextSources,
+            premiumSources: nextPremium,
+        });
+        pushGlobalConfig();
         setEditingSource(null);
     };
 
@@ -374,6 +387,7 @@ export function useSettingsPage() {
 
     return {
         sources,
+        premiumSources,
         subscriptions,
         sortBy,
         realtimeLatency,

@@ -21,6 +21,7 @@ import { useSettingsPage } from './hooks/useSettingsPage';
 export default function SettingsPage() {
   const {
     sources,
+    premiumSources,
     sortBy,
     realtimeLatency,
     searchDisplayMode,
@@ -192,8 +193,9 @@ export default function SettingsPage() {
           setEditingSource(null);
         }}
         onAdd={handleAddSource}
-        existingIds={sources.map(s => s.id)}
+        existingIds={[...sources, ...premiumSources].map(s => s.id)}
         initialValues={editingSource}
+        defaultGroup="normal"
       />
 
       <ExportModal

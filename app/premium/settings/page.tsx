@@ -15,6 +15,7 @@ import Link from 'next/link';
 export default function PremiumSettingsPage() {
     const {
         premiumSources,
+        normalSources,
         isAddModalOpen,
         isRestoreDefaultsDialogOpen,
         setIsAddModalOpen,
@@ -167,8 +168,9 @@ export default function PremiumSettingsPage() {
                     setEditingSource(null);
                 }}
                 onAdd={handleAddSource}
-                existingIds={premiumSources.map(s => s.id)}
+                existingIds={[...normalSources, ...premiumSources].map(s => s.id)}
                 initialValues={editingSource}
+                defaultGroup="premium"
             />
 
             <ConfirmDialog

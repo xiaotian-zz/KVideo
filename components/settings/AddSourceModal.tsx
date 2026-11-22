@@ -22,15 +22,17 @@ interface AddSourceModalProps {
   onAdd: (source: VideoSource) => void;
   existingIds: string[];
   initialValues?: VideoSource | null;
+  defaultGroup?: 'normal' | 'premium';
 }
 
-export function AddSourceModal({ isOpen, onClose, onAdd, existingIds, initialValues }: AddSourceModalProps) {
-  const { name, setName, customId, setCustomId, url, setUrl, error, handleSubmit, isEditing } = useAddSourceForm({
+export function AddSourceModal({ isOpen, onClose, onAdd, existingIds, initialValues, defaultGroup }: AddSourceModalProps) {
+  const { name, setName, customId, setCustomId, url, setUrl, sourceGroup, setSourceGroup, error, handleSubmit, isEditing } = useAddSourceForm({
     isOpen,
     existingIds,
     onAdd,
     onClose,
     initialValues,
+    defaultGroup,
   });
 
   if (!isOpen) return null;
@@ -81,6 +83,39 @@ export function AddSourceModal({ isOpen, onClose, onAdd, existingIds, initialVal
               />
               <p className="mt-1 text-xs text-[var(--text-color-secondary)]">
                 用于唯一标识此源，仅支持小写字母、数字和连字符
+              </p>
+            </div>
+
+            <div>
+              <label className="block mb-2 font-medium text-[var(--text-color)]">
+                源类型
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSourceGroup('normal')}
+                  className={`px-4 py-2.5 rounded-[var(--radius-2xl)] border text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                    sourceGroup === 'normal'
+                      ? 'bg-[var(--accent-color)] text-white border-transparent'
+                      : 'bg-[var(--glass-bg)] text-[var(--text-color-secondary)] border-[var(--glass-border)] hover:text-[var(--text-color)]'
+                  }`}
+                >
+                  普通源
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourceGroup('premium')}
+                  className={`px-4 py-2.5 rounded-[var(--radius-2xl)] border text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                    sourceGroup === 'premium'
+                      ? 'bg-[var(--accent-color)] text-white border-transparent'
+                      : 'bg-[var(--glass-bg)] text-[var(--text-color-secondary)] border-[var(--glass-border)] hover:text-[var(--text-color)]'
+                  }`}
+                >
+                  18+ 源
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-[var(--text-color-secondary)]">
+                18+ 源仅在高级模式中显示和使用
               </p>
             </div>
 

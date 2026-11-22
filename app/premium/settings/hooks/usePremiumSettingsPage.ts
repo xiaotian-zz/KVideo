@@ -14,6 +14,7 @@ import { pushGlobalConfig } from '@/lib/utils/global-config-client';
 
 export function usePremiumSettingsPage() {
     const [premiumSources, setPremiumSources] = useState<VideoSource[]>([]);
+    const [normalSources, setNormalSources] = useState<VideoSource[]>([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isRestoreDefaultsDialogOpen, setIsRestoreDefaultsDialogOpen] = useState(false);
     const [editingSource, setEditingSource] = useState<VideoSource | null>(null);
@@ -42,6 +43,7 @@ export function usePremiumSettingsPage() {
             const modeSettings = premiumModeSettingsStore.getSettings();
 
             setPremiumSources(settings.premiumSources || []);
+            setNormalSources(settings.sources || []);
             setLocale(settings.locale);
             setBlockedCategories(settings.blockedCategories || []);
 
@@ -80,11 +82,22 @@ export function usePremiumSettingsPage() {
     };
 
     const handleAddSource = (source: VideoSource) => {
-        const exists = premiumSources.some(s => s.id === source.id);
-        const updated = exists
-            ? premiumSources.map(s => s.id === source.id ? source : s)
-            : [...premiumSources, source];
-        handleSourcesChange(updated);
+        const currentSettings = settingsStore.getSettings();
+        const nextSources = currentSettings.sources.filter(s => s.id !== source.id);
+        const nextPremium = currentSettings.premiumSources.filter(s => s.id !== source.id);
+
+        if (source.group === 'normal') {
+            nextSources.push({ ...source, group: 'normal' });
+        } else {
+            nextPremium.push({ ...source, group: 'premium' });
+        }
+
+        settingsStore.saveSettings({
+            ...currentSettings,
+            sources: nextSources,
+            premiumSources: nextPremium,
+        });
+        pushGlobalConfig();
         setEditingSource(null);
     };
 
@@ -177,6 +190,7 @@ export function usePremiumSettingsPage() {
 
     return {
         premiumSources,
+        normalSources,
         isAddModalOpen,
         isRestoreDefaultsDialogOpen,
         setIsAddModalOpen,

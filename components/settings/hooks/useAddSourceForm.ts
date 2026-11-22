@@ -14,6 +14,7 @@ interface UseAddSourceFormProps {
     onAdd: (source: VideoSource) => void;
     onClose: () => void;
     initialValues?: VideoSource | null;
+    defaultGroup?: 'normal' | 'premium';
 }
 
 function generateIdFromName(name: string): string {
@@ -30,11 +31,12 @@ function generateIdFromName(name: string): string {
     return slug || `custom-${Date.now().toString(36)}`;
 }
 
-export function useAddSourceForm({ isOpen, existingIds, onAdd, onClose, initialValues }: UseAddSourceFormProps) {
+export function useAddSourceForm({ isOpen, existingIds, onAdd, onClose, initialValues, defaultGroup = 'normal' }: UseAddSourceFormProps) {
     const [name, setName] = useState('');
     const [customId, setCustomId] = useState('');
     const [idManuallyEdited, setIdManuallyEdited] = useState(false);
     const [url, setUrl] = useState('');
+    const [sourceGroup, setSourceGroup] = useState<'normal' | 'premium'>(defaultGroup);
     const [error, setError] = useState('');
 
     // 打开或编辑对象变化时，在渲染阶段重置表单
@@ -46,11 +48,19 @@ export function useAddSourceForm({ isOpen, existingIds, onAdd, onClose, initialV
                 setName(initialValues.name);
                 setCustomId(initialValues.id);
                 setUrl(initialValues.baseUrl);
+                setSourceGroup(
+                    initialValues.group === 'premium'
+                        ? 'premium'
+                        : initialValues.group === 'normal'
+                            ? 'normal'
+                            : defaultGroup
+                );
                 setIdManuallyEdited(true);
             } else {
                 setName('');
                 setCustomId('');
                 setUrl('');
+                setSourceGroup(defaultGroup);
                 setIdManuallyEdited(false);
             }
             setError('');
@@ -100,6 +110,7 @@ export function useAddSourceForm({ isOpen, existingIds, onAdd, onClose, initialV
             detailPath: initialValues?.detailPath || '',
             enabled: initialValues?.enabled ?? true,
             priority: initialValues?.priority || existingIds.length + 1,
+            group: sourceGroup,
         };
 
         onAdd(newSource);
@@ -113,6 +124,8 @@ export function useAddSourceForm({ isOpen, existingIds, onAdd, onClose, initialV
         setCustomId: handleIdChange,
         url,
         setUrl,
+        sourceGroup,
+        setSourceGroup,
         error,
         handleSubmit,
         isEditing: !!initialValues,

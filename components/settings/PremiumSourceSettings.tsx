@@ -106,6 +106,7 @@ export function PremiumSourceSettings({
                 onReorder={handleReorder}
                 onEdit={onEditSource}
                 defaultIds={PREMIUM_SOURCES.map(s => s.id)}
+                premium
             />
             {!searchQuery && sources.length > 10 && (
                 <button

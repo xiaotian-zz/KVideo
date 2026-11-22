@@ -9,6 +9,7 @@ interface SourceManagerProps {
   onReorder: (id: string, direction: 'up' | 'down') => void;
   onEdit?: (source: VideoSource) => void;
   defaultIds: string[];
+  premium?: boolean;
 }
 
 export function SourceManager({
@@ -17,7 +18,8 @@ export function SourceManager({
   onDelete,
   onReorder,
   onEdit,
-  defaultIds
+  defaultIds,
+  premium = false
 }: SourceManagerProps) {
   const handleToggle = (id: string) => {
     onToggle(id);
@@ -60,8 +62,15 @@ export function SourceManager({
 
               {/* Source Info */}
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[var(--text-color)] truncate">
-                  {source.name}
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-[var(--text-color)] truncate">
+                    {source.name}
+                  </span>
+                  {(premium || source.group === 'premium') && (
+                    <span className="shrink-0 px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
+                      18+
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-[var(--text-color-secondary)] truncate">
                   {source.baseUrl}

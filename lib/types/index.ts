@@ -12,7 +12,7 @@ export interface VideoSource {
   headers?: Record<string, string>;
   enabled?: boolean;
   priority?: number;
-  group?: 'normal' | 'premium'; // Categorize source type for routing
+  group?: 'normal' | 'premium'; // normal = 普通源，premium = 18+ 源
 }
 
 // Source Subscription for auto-updating sources from a URL
