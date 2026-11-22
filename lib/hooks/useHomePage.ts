@@ -47,7 +47,6 @@ export function useHomePage() {
         if (!searchQuery.trim()) return false;
 
         const settings = settingsStore.getSettings();
-        // 所有用户统一使用管理员维护的全局视频源
         const allSources = settings.sources.filter(s => s.enabled);
 
         if (allSources.length === 0) {

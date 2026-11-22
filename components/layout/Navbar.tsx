@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { useSiteIcon } from '@/components/SiteIconProvider';
@@ -17,6 +18,7 @@ interface NavbarProps {
 }
 
 export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
+    const router = useRouter();
     const settingsHref = isPremiumMode ? '/premium/settings' : '/settings';
     const favoritesHref = isPremiumMode ? '/premium/favorites' : '/favorites';
     const [session] = useState<AuthSession | null>(() => getSession());
@@ -30,8 +32,8 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
             })
             .finally(() => {
                 clearSession();
-                // 重新加载以清除上一个用户的内存数据并恢复未登录状态
-                window.location.href = '/';
+                router.push('/');
+                router.refresh();
             });
     };
 
@@ -89,7 +91,7 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
                                             {session.name.charAt(0)}
                                         </div>
                                         <span className="text-[var(--text-color)] max-w-[60px] truncate">{session.name}</span>
-                                        {(session.role === 'admin') && (
+                                        {session.role === 'admin' && (
                                             <span className="px-1 py-0.5 bg-[var(--accent-color)]/10 text-[var(--accent-color)] rounded text-[10px] font-medium">
                                                 管理员
                                             </span>
