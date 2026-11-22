@@ -5,8 +5,8 @@
 'use client';
 
 import { useState } from 'react';
-import { pinyin } from 'pinyin-pro';
 import type { VideoSource } from '@/lib/types';
+import { generateSourceIdFromName } from '@/lib/utils/source-id';
 
 interface UseAddSourceFormProps {
     isOpen: boolean;
@@ -18,17 +18,7 @@ interface UseAddSourceFormProps {
 }
 
 function generateIdFromName(name: string): string {
-    // 中文转拼音全拼，非中文保留字母数字，最终只留小写字母和数字
-    const fullPinyin = pinyin(name, {
-        toneType: 'none',
-        type: 'string',
-        nonZh: 'consecutive',
-    });
-    const slug = fullPinyin
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '')
-        .replace(/^-+|-+$/g, '');
-    return slug || `custom-${Date.now().toString(36)}`;
+    return generateSourceIdFromName(name);
 }
 
 export function useAddSourceForm({ isOpen, existingIds, onAdd, onClose, initialValues, defaultGroup = 'normal' }: UseAddSourceFormProps) {

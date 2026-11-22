@@ -14,7 +14,7 @@ export function CategoryPills({ items, activeId, onChange, allLabel }: CategoryP
   const allItems = allLabel ? [{ id: '', name: allLabel }, ...items] : items;
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2">
+    <div className="flex flex-wrap gap-2 pb-2">
       {allItems.map((item) => {
         const isActive = item.id === activeId;
 

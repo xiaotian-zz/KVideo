@@ -82,7 +82,7 @@ export function LinkImportTab({ onImport }: LinkImportTabProps) {
                 </div>
 
                 <p className="text-xs text-[var(--text-color-secondary)] mt-2 ml-1">
-                    支持 JSON 配置文件格式的单个或多个源配置链接
+                    支持 JSON 源配置链接，每项只需要 name 和 url（兼容 baseUrl）
                 </p>
 
                 {error && (

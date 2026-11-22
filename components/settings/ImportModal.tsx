@@ -95,7 +95,7 @@ export function ImportModal({
             )}
 
             {activeTab === 'json' && (
-              <JsonImportTab />
+              <JsonImportTab onImport={onImportLink} />
             )}
           </div>
         </div>

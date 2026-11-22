@@ -28,7 +28,7 @@ export function FileImportTab({ onImport }: FileImportTabProps) {
                     setSuccess(true);
                     setError('');
                 } else {
-                    setError('导入失败：文件格式无效');
+                    setError('导入失败：文件格式无效或当前账户没有管理员权限');
                     setSuccess(false);
                 }
             } catch (err) {
@@ -49,7 +49,7 @@ export function FileImportTab({ onImport }: FileImportTabProps) {
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="p-4 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)]">
                 <p className="text-[var(--text-color-secondary)] text-sm mb-4">
-                    选择之前导出的设置文件（JSON 配置文件）。支持新旧版本格式。
+                    选择之前导出的备份文件（JSON）。支持全量数据备份、旧版设置文件和源配置（name + url）。
                 </p>
 
                 <input

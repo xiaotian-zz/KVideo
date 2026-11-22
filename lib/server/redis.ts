@@ -6,6 +6,7 @@ import { getRuntimeEnvValue } from '@/lib/server/runtime-env';
 export interface KeyValueStore {
   get<T = unknown>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;
+  keys?(pattern: string): Promise<string[]>;
 }
 
 let cachedStore: KeyValueStore | null | undefined;
@@ -81,6 +82,9 @@ function createNodeStore(url: string): KeyValueStore {
     async set(key: string, value: unknown): Promise<void> {
       await run(() => client.set(key, JSON.stringify(value)));
     },
+    async keys(pattern: string): Promise<string[]> {
+      return run(() => client.keys(pattern));
+    },
   };
 
   return store;
@@ -95,6 +99,9 @@ function createUpstashStore(url: string, token: string): KeyValueStore {
     },
     async set(key: string, value: unknown): Promise<void> {
       await redis.set(key, value);
+    },
+    async keys(pattern: string): Promise<string[]> {
+      return redis.keys(pattern);
     },
   };
 }

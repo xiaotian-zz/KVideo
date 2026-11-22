@@ -132,18 +132,44 @@ export function useSettingsPage() {
         });
     };
 
-    const handleExport = (includeSearchHistory: boolean, includeWatchHistory: boolean) => {
-        const data = settingsStore.exportSettings(includeSearchHistory || includeWatchHistory);
-        const blob = new Blob([data], { type: 'application/json' });
+    const handleExport = async () => {
+        const response = await fetch('/api/admin/backup', { cache: 'no-store' });
+        if (!response.ok) {
+            const data = await response.json().catch(() => null);
+            throw new Error(data?.error || '导出失败，请确认当前账户是管理员');
+        }
+
+        const text = await response.text();
+        const blob = new Blob([text], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         a.href = url;
-        a.download = `kvideo-settings-${Date.now()}.json`;
+        a.download = `kvideo-backup-${stamp}.json`;
         a.click();
         URL.revokeObjectURL(url);
     };
 
-    const handleImportFile = (jsonString: string): boolean => {
+    const handleImportFile = async (jsonString: string): Promise<boolean> => {
+        // 全量备份：恢复账户、全局配置和所有用户数据
+        try {
+            const parsed = JSON.parse(jsonString);
+            if (parsed?.format === 'kvideo-backup') {
+                const response = await fetch('/api/admin/backup', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: jsonString,
+                });
+                if (!response.ok) {
+                    return false;
+                }
+                setTimeout(() => window.location.reload(), 1000);
+                return true;
+            }
+        } catch {
+            // 继续尝试旧格式
+        }
+
         // 1. Try to import as full settings backup
         const asBackupSuccess = settingsStore.importSettings(jsonString);
         if (asBackupSuccess) {
