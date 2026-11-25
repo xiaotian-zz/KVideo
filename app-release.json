@@ -4,8 +4,17 @@
     "name": "KVideo",
     "branch": "main"
   },
-  "currentVersion": "202611252137",
+  "currentVersion": "202611252152",
   "releases": [
+    {
+      "version": "202611252152",
+      "publishedAt": "2026-11-25",
+      "title": "构建镜像源优化",
+      "notes": [
+        "npm 依赖改用 npmmirror 镜像（中科大 npm 反代已停止服务并重定向至该源）。",
+        "Docker 内 Alpine apk 源改为中科大镜像，缩短镜像构建时间。"
+      ]
+    },
     {
       "version": "202611252137",
       "publishedAt": "2026-11-25",
