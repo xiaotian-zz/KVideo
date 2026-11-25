@@ -64,6 +64,21 @@ export function createPrefetchLoaders(
         };
     };
 
+    // hls.js 会在 load() 之前保存 loader.stats 引用（frag.stats = loader.stats），
+    // 命中缓存时必须原地更新该对象，不能重新赋值，否则分片统计会丢失。
+    const fillStats = (stats: any, byteLength: number) => {
+        if (!stats) return makeStats(byteLength);
+        const t = now();
+        if (!stats.loading) stats.loading = { start: t, first: t, end: t };
+        stats.loading.start = stats.loading.start || t;
+        stats.loading.first = t;
+        stats.loading.end = t;
+        stats.total = byteLength;
+        stats.loaded = byteLength;
+        stats.bwEstimate = 0;
+        return stats;
+    };
+
     const evictOldest = () => {
         while (cache.size > cacheLimit) {
             const oldest = cache.keys().next().value;
@@ -245,8 +260,7 @@ export function createPrefetchLoaders(
             if (entry?.status === 'ready' && entry.data) {
                 cache.delete(url);
                 const data = entry.data;
-                const stats = makeStats(data.byteLength);
-                this.stats = stats as any;
+                const stats = fillStats(this.stats, data.byteLength);
                 callbacks.onSuccess({ url, data }, stats, context, undefined);
                 prefetchAfter(url);
                 return;
@@ -280,8 +294,7 @@ export function createPrefetchLoaders(
                         clearTimeout(timer);
                         if (state.cancelled || this.loadState !== state) return;
                         cache.delete(url);
-                        const stats = makeStats(data.byteLength);
-                        this.stats = stats as any;
+                        const stats = fillStats(this.stats, data.byteLength);
                         callbacks.onSuccess(
                             { url, data },
                             stats,
@@ -322,18 +335,12 @@ export function createPrefetchLoaders(
         }
 
         destroy() {
+            // hls.js 每加载完一个分片就会销毁该 loader 实例；
+            // 这里不能清理共享预取缓存，否则下一次分片永远无法命中。
+            // 共享状态统一在 PrefetchPlaylistLoader.destroy()（Hls 实例销毁）时清理。
             if (this.loadState) {
                 this.loadState.cancelled = true;
             }
-            const url: string = this.context?.url;
-            if (url) {
-                const entry = cache.get(url);
-                if (entry && entry.status === 'pending') {
-                    cancelPrefetch(url);
-                }
-            }
-            cancelPrefetchBatch();
-            clearPrefetchState();
             super.destroy();
         }
     }
