@@ -8,6 +8,8 @@ import Hls, {
 import { usePlayerSettings } from './usePlayerSettings';
 import { filterM3u8Ad } from '@/lib/utils/m3u8-utils';
 import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
+import { getPlaybackBufferConfig, getPlaybackBufferMode } from '@/lib/player/buffer-modes';
+import { createPrefetchLoaders } from '@/lib/player/hls-prefetch-loader';
 
 interface UseHlsPlayerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -81,15 +83,18 @@ export function useHlsPlayer({
                 // Exceptions might exist for iOS where MSE is strictly not available, check Hls.isSupported() result carefully.
                 // Hls.isSupported() is false on iOS Safari usually, so this block won't run there.
 
+                // 后台统一的播放缓冲模式：45/90/135 秒 + 2/3/4 路预取
+                const bufferConfig = getPlaybackBufferConfig(getPlaybackBufferMode());
+
                 const config: Partial<HlsConfig> = {
                     // Worker & Performance
                     enableWorker: true,
                     lowLatencyMode: false,
 
                     // Buffer Settings
-                    maxBufferLength: 120,
-                    maxMaxBufferLength: 240,
-                    maxBufferSize: 120 * 1000 * 1000,
+                    maxBufferLength: bufferConfig.maxBufferLength,
+                    maxMaxBufferLength: bufferConfig.maxBufferLength * 2,
+                    maxBufferSize: bufferConfig.maxBufferSize,
                     maxBufferHole: 0.5,
 
                     // Start with more buffer
@@ -121,11 +126,23 @@ export function useHlsPlayer({
                     levelLoadingTimeOut: 10000,
 
                     // Backbuffer
-                    backBufferLength: 90,
+                    backBufferLength: bufferConfig.backBufferLength,
                 };
 
-                // Use custom loader if ad filtering is enabled
-                if (isAdFilterEnabled) {
+                // 分片并发预取；广告过滤通过 playlist 转换继续生效
+                const prefetchLoaders = createPrefetchLoaders(
+                    bufferConfig.prefetchConcurrency,
+                    DefaultLoader,
+                    {
+                        transformPlaylist: isAdFilterEnabled
+                            ? (body, baseUrl) => filterM3u8Ad(body, baseUrl, adFilterMode, adKeywords)
+                            : undefined,
+                    },
+                );
+                Object.assign(config, prefetchLoaders);
+
+                // 预取关闭时回退到纯广告过滤 loader
+                if (!prefetchLoaders && isAdFilterEnabled) {
                     config.loader = AdFilterLoader;
                 }
 

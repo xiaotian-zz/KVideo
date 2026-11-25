@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
           iptvSources: data.iptvSources,
           siteTitle: data.siteTitle,
           roleSourceAccess: data.roleSourceAccess,
+          playbackBufferMode: data.playbackBufferMode,
           updatedAt: data.updatedAt,
         };
 

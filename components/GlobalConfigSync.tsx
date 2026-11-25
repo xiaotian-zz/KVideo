@@ -8,6 +8,11 @@ import { siteSettingsStore } from '@/lib/store/site-settings-store';
 import { useIPTVStore } from '@/lib/store/iptv-store';
 import { getSession } from '@/lib/store/auth-store';
 import {
+  getPlaybackBufferMode,
+  normalizePlaybackBufferMode,
+  setPlaybackBufferMode,
+} from '@/lib/player/buffer-modes';
+import {
   pushGlobalConfig,
   subscribeGlobalConfigUpdates,
 } from '@/lib/utils/global-config-client';
@@ -54,6 +59,12 @@ export function GlobalConfigSync() {
         const nextSiteTitle = typeof data.siteTitle === 'string' ? data.siteTitle : '';
         if (siteSettingsStore.getTitle() !== nextSiteTitle) {
           siteSettingsStore.setTitle(nextSiteTitle);
+        }
+
+        // 播放缓冲模式由管理员统一控制，所有用户共用
+        const nextBufferMode = normalizePlaybackBufferMode(data.playbackBufferMode);
+        if (getPlaybackBufferMode() !== nextBufferMode) {
+          setPlaybackBufferMode(nextBufferMode);
         }
 
         // 直播源改为全局配置，所有用户使用同一份，不再同步个人源

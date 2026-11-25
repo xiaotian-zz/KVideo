@@ -12,6 +12,7 @@ import { AccountSettings } from '@/components/settings/AccountSettings';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { SiteTitleSettings } from '@/components/settings/SiteTitleSettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
+import { PlaybackBufferSettings } from '@/components/settings/PlaybackBufferSettings';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
 import { AppVersionSettings } from '@/components/settings/AppVersionSettings';
 import { UserDanmakuSettings } from '@/components/settings/UserDanmakuSettings';
@@ -128,25 +129,28 @@ export default function SettingsPage() {
               id: 'player',
               label: '播放器',
               content: (
-                <PlayerSettings
-                  fullscreenType={fullscreenType}
-                  onFullscreenTypeChange={handleFullscreenTypeChange}
-                  proxyMode={proxyMode}
-                  onProxyModeChange={handleProxyModeChange}
-                  seekStepSeconds={seekStepSeconds}
-                  onSeekStepSecondsChange={handleSeekStepSecondsChange}
-                  videoTogetherEnabled={videoTogetherEnabled}
-                  onVideoTogetherEnabledChange={handleVideoTogetherEnabledChange}
-                  danmakuApiUrl={danmakuApiUrl}
-                  onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
-                  danmakuOpacity={danmakuOpacity}
-                  onDanmakuOpacityChange={handleDanmakuOpacityChange}
-                  danmakuFontSize={danmakuFontSize}
-                  onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
-                  danmakuDisplayArea={danmakuDisplayArea}
-                  onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
-                  showDanmakuApi={hasPermission('danmaku_api')}
-                />
+                <div>
+                  <PlaybackBufferSettings />
+                  <PlayerSettings
+                    fullscreenType={fullscreenType}
+                    onFullscreenTypeChange={handleFullscreenTypeChange}
+                    proxyMode={proxyMode}
+                    onProxyModeChange={handleProxyModeChange}
+                    seekStepSeconds={seekStepSeconds}
+                    onSeekStepSecondsChange={handleSeekStepSecondsChange}
+                    videoTogetherEnabled={videoTogetherEnabled}
+                    onVideoTogetherEnabledChange={handleVideoTogetherEnabledChange}
+                    danmakuApiUrl={danmakuApiUrl}
+                    onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
+                    danmakuOpacity={danmakuOpacity}
+                    onDanmakuOpacityChange={handleDanmakuOpacityChange}
+                    danmakuFontSize={danmakuFontSize}
+                    onDanmakuFontSizeChange={handleDanmakuFontSizeChange}
+                    danmakuDisplayArea={danmakuDisplayArea}
+                    onDanmakuDisplayAreaChange={handleDanmakuDisplayAreaChange}
+                    showDanmakuApi={hasPermission('danmaku_api')}
+                  />
+                </div>
               ),
             },
             {

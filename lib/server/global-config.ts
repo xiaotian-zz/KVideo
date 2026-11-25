@@ -11,6 +11,11 @@ import {
 } from '@/lib/auth/permissions';
 import type { SourceSubscription, VideoSource } from '@/lib/types';
 import type { IPTVSource } from '@/lib/store/iptv-store';
+import {
+  DEFAULT_PLAYBACK_BUFFER_MODE,
+  normalizePlaybackBufferMode,
+  type PlaybackBufferMode,
+} from '@/lib/player/buffer-modes';
 
 /**
  * 全局配置：由管理员维护，所有用户共用。
@@ -24,6 +29,8 @@ export interface GlobalConfig {
   siteTitle: string;
   metadata: MetadataConfig;
   roleSourceAccess: RoleSourceAccess;
+  /** 播放缓冲模式：管理员统一控制，所有用户共用 */
+  playbackBufferMode: PlaybackBufferMode;
   updatedAt: number;
 }
 
@@ -74,6 +81,7 @@ export function normalizeGlobalConfig(value: unknown): GlobalConfig | null {
       ? normalizeMetadataConfig(input.metadata)
       : { ...DEFAULT_METADATA_CONFIG },
     roleSourceAccess: normalizeRoleSourceAccess(input.roleSourceAccess),
+    playbackBufferMode: normalizePlaybackBufferMode(input.playbackBufferMode),
     updatedAt: typeof input.updatedAt === 'number' ? input.updatedAt : Date.now(),
   };
 }
@@ -111,6 +119,9 @@ export async function writeGlobalConfig(value: unknown): Promise<GlobalConfig> {
     roleSourceAccess: input.roleSourceAccess
       ?? existing?.roleSourceAccess
       ?? DEFAULT_ROLE_SOURCE_ACCESS,
+    playbackBufferMode: input.playbackBufferMode
+      ?? existing?.playbackBufferMode
+      ?? DEFAULT_PLAYBACK_BUFFER_MODE,
     updatedAt: Date.now(),
   });
 
