@@ -93,7 +93,8 @@ export function useHlsPlayer({
 
                     // Buffer Settings
                     maxBufferLength: bufferConfig.maxBufferLength,
-                    maxMaxBufferLength: bufferConfig.maxBufferLength * 2,
+                    // 硬上限与档位标称值一致，否则 45/90/135 秒会被放大到 2 倍，三档时长看起来一样
+                    maxMaxBufferLength: bufferConfig.maxBufferLength,
                     maxBufferSize: bufferConfig.maxBufferSize,
                     maxBufferHole: 0.5,
 
