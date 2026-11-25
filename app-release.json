@@ -1,11 +1,21 @@
 {
   "repository": {
-    "owner": "KuekHaoYang",
+    "owner": "xiaotian-zz",
     "name": "KVideo",
     "branch": "main"
   },
-  "currentVersion": "4.9.20",
+  "currentVersion": "202611252118",
   "releases": [
+    {
+      "version": "202611252118",
+      "publishedAt": "2026-11-25",
+      "title": "后台播放缓冲模式与依赖更新",
+      "notes": [
+        "后台新增全局播放缓冲模式：45 秒 + 2 路、90 秒 + 3 路、135 秒 + 4 路预取，仅管理员可切换，对所有用户生效。",
+        "修复 hls.js 每个分片加载完成后预取缓存被清空、导致播放卡在首个分片的问题。",
+        "依赖升级至最新兼容版本，版本号改为时间戳格式（yyyyMMddHHmm）。"
+      ]
+    },
     {
       "version": "4.9.20",
       "publishedAt": "2026-08-16",
