@@ -1,8 +1,11 @@
 services:
   kvideo:
+    image: fuxiaotian/kvideo:latest
     build: .
     container_name: kvideo
     restart: unless-stopped
+    labels:
+      - 'com.centurylinklabs.watchtower.enable=true'
     ports:
       - '3001:3000'
     environment:
@@ -11,9 +14,13 @@ services:
       - AUTH_SECRET=${AUTH_SECRET:?AUTH_SECRET is required in .env}
       - KVROCKS_URL=redis://kvideo-kvrocks:6666
       - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+      - WATCHTOWER_URL=http://watchtower:8080
+      - WATCHTOWER_TOKEN=${WATCHTOWER_TOKEN:?WATCHTOWER_TOKEN is required in .env}
     depends_on:
       - kvideo-kvrocks
 
+  # 所有账户、视频源、收藏/历史等数据都在 kvrocks-data 卷中。
+  # Watchtower 只重建带 label 的 kvideo 应用容器，不会停止或重建 kvideo-kvrocks。
   kvideo-kvrocks:
     image: apache/kvrocks
     container_name: kvideo-kvrocks
@@ -22,6 +29,21 @@ services:
       - '6666:6666'
     volumes:
       - kvrocks-data:/var/lib/kvrocks
+
+  watchtower:
+    image: nickfedor/watchtower:latest
+    container_name: kvideo-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_HTTP_API_UPDATE=true
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN:?WATCHTOWER_TOKEN is required in .env}
+      - WATCHTOWER_LABEL_ENABLE=true
+      # 保留旧镜像，更新异常时仍可回滚
+      - WATCHTOWER_CLEANUP=false
+      # 给应用足够的优雅停机时间
+      - WATCHTOWER_STOP_TIMEOUT=30
 
 volumes:
   kvrocks-data:

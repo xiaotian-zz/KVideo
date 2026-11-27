@@ -7,6 +7,8 @@ export interface KeyValueStore {
   get<T = unknown>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;
   keys?(pattern: string): Promise<string[]>;
+  /** 触发持久化快照；仅原生 Redis / Kvrocks 支持 */
+  bgSave?(): Promise<void>;
 }
 
 let cachedStore: KeyValueStore | null | undefined;
@@ -82,6 +84,9 @@ function createNodeStore(url: string): KeyValueStore {
     },
     async keys(pattern: string): Promise<string[]> {
       return run(() => client.keys(pattern));
+    },
+    async bgSave(): Promise<void> {
+      await run(() => client.bgSave());
     },
   };
 

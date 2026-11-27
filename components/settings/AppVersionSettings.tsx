@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { ExternalLink, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Download, ExternalLink, RefreshCw } from 'lucide-react';
 import { SettingsSection } from './SettingsSection';
+import { getSession } from '@/lib/store/auth-store';
 import type { AppReleaseEntry, AppUpdateResponse } from '@/lib/types/app-update';
 
 const DEFAULT_SOURCE = {
@@ -108,6 +109,10 @@ export function AppVersionSettings() {
   const [data, setData] = useState<AppUpdateResponse | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState('');
+  const updatePollRef = useRef<number | null>(null);
 
   const fetchUpdateInfo = useCallback(async (manual: boolean = false) => {
     if (manual) {
@@ -155,9 +160,95 @@ export function AppVersionSettings() {
     void fetchUpdateInfo(false);
   }, [fetchUpdateInfo]);
 
+  useEffect(() => {
+    // 延迟到水合完成后再读取本地会话，避免服务端与客户端渲染不一致
+    const timer = setTimeout(() => {
+      setIsAdmin(getSession()?.role === 'admin');
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (updatePollRef.current !== null) {
+        window.clearInterval(updatePollRef.current);
+      }
+    };
+  }, []);
+
   const handleRefresh = () => {
     void fetchUpdateInfo(true);
   };
+
+  const startUpdatePolling = useCallback(() => {
+    setUpdateMessage('更新已触发，服务重启后页面会自动刷新…');
+    const startedAt = Date.now();
+
+    if (updatePollRef.current !== null) {
+      window.clearInterval(updatePollRef.current);
+    }
+
+    updatePollRef.current = window.setInterval(async () => {
+      if (Date.now() - startedAt > 180000) {
+        if (updatePollRef.current !== null) {
+          window.clearInterval(updatePollRef.current);
+          updatePollRef.current = null;
+        }
+        setIsUpdating(false);
+        setUpdateMessage('更新仍在进行，请稍后手动刷新页面。');
+        return;
+      }
+
+      try {
+        const check = await fetch('/api/app-update', { cache: 'no-store' });
+        if (!check.ok) return;
+
+        const latest = (await check.json()) as AppUpdateResponse;
+        if (!latest.updateAvailable) {
+          if (updatePollRef.current !== null) {
+            window.clearInterval(updatePollRef.current);
+            updatePollRef.current = null;
+          }
+          window.location.reload();
+        }
+      } catch {
+        // 服务重启期间请求会失败，继续等待
+      }
+    }, 5000);
+  }, []);
+
+  const handleApplyUpdate = useCallback(async () => {
+    if (isUpdating) return;
+
+    if (!window.confirm('确定要立即更新吗？更新期间服务会短暂重启。')) {
+      return;
+    }
+
+    setIsUpdating(true);
+    setUpdateMessage('正在从 Docker 拉取最新镜像…');
+
+    try {
+      const response = await fetch('/api/app-update/apply', { method: 'POST' });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+
+      if (response.status === 401 || response.status === 403) {
+        setUpdateMessage(payload.error || '需要管理员权限才能更新。');
+        setIsUpdating(false);
+        return;
+      }
+
+      if (response.status === 503) {
+        setUpdateMessage('当前部署未启用自动更新（需要 Watchtower）。');
+        setIsUpdating(false);
+        return;
+      }
+
+      // 502 或网络中断也可能是容器正在重启，继续轮询等待新版本上线
+      startUpdatePolling();
+    } catch {
+      startUpdatePolling();
+    }
+  }, [isUpdating, startUpdatePolling]);
 
   const statusMeta = getStatusMeta(data);
   const currentRelease = data?.currentRelease ?? null;
@@ -202,6 +293,33 @@ export function AppVersionSettings() {
             </p>
           </div>
         </div>
+
+        {isAdmin && data?.updateAvailable ? (
+          <div className="rounded-[var(--radius-2xl)] border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-color)]">
+                  从 Docker 更新到 {data.latestVersion}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-color-secondary)]">
+                  将拉取 fuxiaotian/kvideo:latest 并自动重启服务，通常需要几十秒。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleApplyUpdate()}
+                disabled={isUpdating}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-[var(--radius-full)] bg-amber-500 px-5 py-2.5 text-sm font-semibold text-black transition-all duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download size={14} className={isUpdating ? 'animate-bounce' : ''} />
+                {isUpdating ? '更新中...' : '立即更新'}
+              </button>
+            </div>
+            {updateMessage ? (
+              <p className="mt-3 text-xs text-[var(--text-color-secondary)]">{updateMessage}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-color-secondary)]">
           <span>
