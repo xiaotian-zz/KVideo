@@ -9,6 +9,11 @@ interface UseProgressControlsProps {
     isRotated?: boolean;
 }
 
+// 手机端进度条：点击不跳转，按住左右拖动才生效（移植自 LunaTV）
+const TOUCH_DRAG_THRESHOLD_PX = 4; // 超过该位移才认定为拖动
+const TOUCH_DRAG_SENSITIVITY = 0.5; // 滑过整条进度条只改变总时长的一半
+const TOUCH_CLICK_SUPPRESS_MS = 700; // 触摸后拦截浏览器补发的 click
+
 export function useProgressControls({
     videoRef,
     progressBarRef,
@@ -18,6 +23,11 @@ export function useProgressControls({
     isRotated = false
 }: UseProgressControlsProps) {
     const lastDragTimeRef = useRef<number>(0);
+    const touchStartXRef = useRef<number>(0);
+    const touchStartYRef = useRef<number>(0);
+    const touchStartTimeRef = useRef<number>(0);
+    const touchMovedRef = useRef<boolean>(false);
+    const lastTouchAtRef = useRef<number>(0);
 
     const getEventPos = useCallback((
         e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement> | MouseEvent | TouchEvent,
@@ -38,6 +48,8 @@ export function useProgressControls({
     }, [isRotated]);
 
     const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+        // 触摸结束后浏览器可能补发 click，拦截它避免覆盖拖动结果
+        if (Date.now() - lastTouchAtRef.current <= TOUCH_CLICK_SUPPRESS_MS) return;
         if (!videoRef.current || !progressBarRef.current) return;
         const rect = progressBarRef.current.getBoundingClientRect();
         const pos = getEventPos(e, rect);
@@ -53,11 +65,8 @@ export function useProgressControls({
         handleProgressClick(e);
     }, [isDraggingProgressRef, handleProgressClick]);
 
-    const handleProgressTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        isDraggingProgressRef.current = true;
-        handleProgressClick(e);
-    }, [isDraggingProgressRef, handleProgressClick]);
+    // 触摸起止由原生 touchstart/touchmove 监听处理（需要 passive: false）
+    const handleProgressTouchStart = useCallback(() => {}, []);
 
     useEffect(() => {
         const handleProgressMouseMove = (e: MouseEvent) => {
@@ -81,22 +90,43 @@ export function useProgressControls({
 
         const handleProgressTouchMove = (e: TouchEvent) => {
             if (!isDraggingProgressRef.current || !progressBarRef.current || !videoRef.current) return;
+            const touch = e.touches[0];
+            if (!touch) return;
             if (e.cancelable) e.preventDefault();
 
             const rect = progressBarRef.current.getBoundingClientRect();
-            const pos = getEventPos(e, rect);
-            const newTime = pos * duration;
+            // 相对拖动：以按下时的进度为基准，按手指位移量调节
+            const deltaPx = isRotated
+                ? touch.clientY - touchStartYRef.current
+                : touch.clientX - touchStartXRef.current;
+            if (!touchMovedRef.current) {
+                // 单纯点按不跳转，位移超过阈值才认定为拖动
+                if (Math.abs(deltaPx) < TOUCH_DRAG_THRESHOLD_PX) return;
+                touchMovedRef.current = true;
+            }
+
+            const barSize = isRotated ? rect.height : rect.width;
+            if (barSize <= 0 || duration <= 0) return;
+
+            const newTime = Math.min(
+                duration,
+                Math.max(
+                    0,
+                    touchStartTimeRef.current
+                    + (deltaPx / barSize) * duration * TOUCH_DRAG_SENSITIVITY
+                )
+            );
             lastDragTimeRef.current = newTime;
+            // 拖动过程中实时跳转，画面跟随手指
+            videoRef.current.currentTime = newTime;
             setCurrentTime(newTime);
         };
 
         const handleTouchEnd = () => {
-            if (isDraggingProgressRef.current) {
-                isDraggingProgressRef.current = false;
-                if (videoRef.current) {
-                    videoRef.current.currentTime = lastDragTimeRef.current;
-                }
-            }
+            if (!isDraggingProgressRef.current) return;
+            isDraggingProgressRef.current = false;
+            touchMovedRef.current = false;
+            lastTouchAtRef.current = Date.now();
         };
 
         document.addEventListener('mousemove', handleProgressMouseMove);
@@ -112,7 +142,7 @@ export function useProgressControls({
             document.removeEventListener('touchend', handleTouchEnd);
             document.removeEventListener('touchcancel', handleTouchEnd);
         };
-    }, [duration, isDraggingProgressRef, progressBarRef, videoRef, setCurrentTime, getEventPos]);
+    }, [duration, isDraggingProgressRef, progressBarRef, videoRef, setCurrentTime, getEventPos, isRotated]);
 
     // Attach touchstart with passive: false to allow preventDefault (React uses passive by default)
     useEffect(() => {
@@ -120,21 +150,23 @@ export function useProgressControls({
         if (!progressBar) return;
 
         const handleNativeTouchStart = (e: TouchEvent) => {
+            const touch = e.touches[0];
+            if (!touch || !videoRef.current) return;
             e.preventDefault();
+            lastTouchAtRef.current = Date.now();
             isDraggingProgressRef.current = true;
-            if (!videoRef.current) return;
-            const rect = progressBar.getBoundingClientRect();
-            const pos = getEventPos(e, rect);
-            const newTime = pos * duration;
-            lastDragTimeRef.current = newTime;
-            setCurrentTime(newTime);
+            touchMovedRef.current = false;
+            touchStartXRef.current = touch.clientX;
+            touchStartYRef.current = touch.clientY;
+            touchStartTimeRef.current = videoRef.current.currentTime || 0;
+            lastDragTimeRef.current = touchStartTimeRef.current;
         };
 
         progressBar.addEventListener('touchstart', handleNativeTouchStart, { passive: false });
         return () => {
             progressBar.removeEventListener('touchstart', handleNativeTouchStart);
         };
-    }, [progressBarRef, videoRef, isDraggingProgressRef, duration, setCurrentTime, getEventPos]);
+    }, [progressBarRef, videoRef, isDraggingProgressRef]);
 
     const progressActions = useMemo(() => ({
         handleProgressClick,
